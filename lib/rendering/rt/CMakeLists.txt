@@ -30,6 +30,13 @@ if(MOONRAY_USE_OPTIX)
     target_compile_options(${optixLib}
         PRIVATE
             --use_fast_math
+
+    )
+
+    target_compile_definitions(${optixLib}
+        PRIVATE
+            _USE_MATH_DEFINES
+
     )
 
     target_link_libraries(${optixLib}
@@ -144,6 +151,14 @@ if (IsDarwinPlatform)
     #   "moonray::pbr::Camera::update(scene_rdl2::math::Mat4<scene_rdl2::math::Vec4<double>> const&)"
     #   "vtable for moonray::pbr::ProjectiveCamera"
     set_target_properties(${component} PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
+endif()
+
+if (IsWindowsPlatform)
+    # Same as above, there's a circular-dependency between rendering_rt and rendering_pbr
+    # Perhaps a refactor should be done? Re-implement dicing camera in a different way eg.
+    # renderer_pbr sets renderer_rt's GeometryManager dicing camera to a dicingWorld2Render
+    # member prior to running getDicingCameraFrustums()
+    set_target_properties(${component} PROPERTIES LINK_FLAGS "/FORCE:UNRESOLVED")
 endif()
 
 if(MOONRAY_USE_OPTIX)

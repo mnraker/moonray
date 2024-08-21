@@ -6,7 +6,12 @@ set(component bvh_shading_ispc)
 set(installIncludeDir ${PACKAGE_NAME}/rendering/bvh/shading/ispc)
 set(exportGroup ${PROJECT_NAME}Targets)
 
-add_library(${component} SHARED "")
+set(lib_type SHARED)
+if(IsWindowsPlatform)
+    set(lib_type STATIC)
+endif()
+
+add_library(${component} ${lib_type} "")
 add_library(${PROJECT_NAME}::${component} ALIAS ${component})
 
 # If we don't request the C++ linker, cmake-3.21 will complain about
@@ -46,6 +51,8 @@ set_target_properties(${component} PROPERTIES
     ISPC_HEADER_SUFFIX _ispc_stubs.h
     ISPC_HEADER_DIRECTORY /${relBinDir}
     ISPC_INSTRUCTION_SETS ${GLOBAL_ISPC_INSTRUCTION_SETS}
+    ISPC_ARCH ${GLOBAL_ISPC_ARCH}
+    ISPC_TARGET_OS ${GLOBAL_ISPC_TARGET_OS}
     # If we don't request the C++ linker, cmake will complain about
     # a missing variable CMAKE_ISPC_CREATE_SHARED_LIBRARY. This seems
     # to be a bug in CMake-3.23's ISPC support

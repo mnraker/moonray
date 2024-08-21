@@ -27,6 +27,8 @@ set_target_properties(${objLib} PROPERTIES
     ISPC_HEADER_SUFFIX _ispc_stubs.h
     ISPC_HEADER_DIRECTORY /${relBinDir}
     ISPC_INSTRUCTION_SETS ${GLOBAL_ISPC_INSTRUCTION_SETS}
+    ISPC_ARCH ${GLOBAL_ISPC_ARCH}
+    ISPC_TARGET_OS ${GLOBAL_ISPC_TARGET_OS}
     # If we don't request the C++ linker, cmake will complain about
     # a missing variable CMAKE_ISPC_CREATE_SHARED_LIBRARY. This seems
     # to be a bug in CMake-3.23's ISPC support

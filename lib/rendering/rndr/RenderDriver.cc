@@ -25,9 +25,13 @@
 
 #include <scene_rdl2/render/util/Memory.h>
 
-#ifndef PLATFORM_APPLE
+#if !defined(PLATFORM_APPLE) && !defined(PLATFORM_WINDOWS)
 #include <scene_rdl2/render/util/CpuSocketUtil.h>
 #include <scene_rdl2/render/util/ProcCpuAffinity.h>
+#endif
+
+#if defined(PLATFORM_WINDOWS)
+#define PATH_MAX 4096
 #endif
 
 #include <random>
@@ -600,7 +604,7 @@ RenderDriver::RenderDriver(const TLSInitParams &initParams) :
 void
 RenderDriver::setProcCpuAffinity(TLSInitParams& tlsInitParams)
 {
-#ifndef PLATFORM_APPLE
+#if !defined(PLATFORM_APPLE) && !defined(PLATFORM_WINDOWS)
     mEnableRenderPrepCpuAffinity = false;
     tlsInitParams.mEnableMcrtCpuAffinity = true; // default is MCRT CPU-Affinity = ON
 
@@ -2541,7 +2545,7 @@ void
 RenderDriver::setupCpuAffinityLogInfo(std::vector<std::string>& titleTbl,
                                       std::vector<std::string>& msgTbl) const
 {
-#ifndef PLATFORM_APPLE
+#if !defined(PLATFORM_APPLE) && !defined(PLATFORM_WINDOWS)
     titleTbl.push_back("RenderPrep CPU-affinity");
     if (mEnableRenderPrepCpuAffinity) {
         if (mSocketAffinityDefStr.empty()) {

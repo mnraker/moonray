@@ -29,6 +29,13 @@ getErrorDescription()
     }
 
     return e;
+#elif _WIN32
+    std::string e("Unknown error");
+    if (strerror_s(errbuf.data(), errbuf.size(), errno) >= 0) {
+        e = errbuf.data();
+    }
+
+    return e;
 #else
     // Oddly enough, this function may not use the errbuf data at all, and
     // if you use it instead of the return value, you may get garbage.

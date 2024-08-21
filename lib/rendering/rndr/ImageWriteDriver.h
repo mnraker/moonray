@@ -14,6 +14,32 @@
 #include <thread>
 #include <time.h>
 
+#ifdef _WIN32
+
+// A dummy siginfo_t as public headers use it
+
+typedef int pid_t;
+typedef int uid_t;
+
+union sigval {
+	int sival_int;
+	void *sival_ptr;
+};
+
+typedef struct {
+	int si_signo;
+	int si_code;
+	union sigval si_value;
+	int si_errno;
+	pid_t si_pid;
+	uid_t si_uid;
+	void *si_addr;
+	int si_status;
+	int si_band;
+} siginfo_t;
+
+#endif
+
 namespace moonray {
 namespace rndr {
 

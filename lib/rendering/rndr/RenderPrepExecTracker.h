@@ -9,6 +9,7 @@
 
 #include <memory>               // unique_ptr
 #include <functional>           // function
+#include <string>
 
 namespace scene_rdl2 {
 

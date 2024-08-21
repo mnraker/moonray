@@ -15,7 +15,9 @@
 #include <string>
 
 #include <stdarg.h>             // va_arg
+#ifndef _MSC_VER
 #include <unistd.h>             // gethostname()
+#endif
 
 namespace {
     
@@ -24,9 +26,16 @@ std::string
 getHostname()
 {
     char buff[4096];
+#ifndef _MSC_VER
     if (gethostname(buff, 4096) == -1) {
         return std::string("");
     }
+#else
+    DWORD bufCharCount = 4096;
+    if (GetComputerNameA(reinterpret_cast<LPSTR>(buff), &bufCharCount) == 0) {
+        return std::string("");
+    }
+#endif
     return std::string(buff);
 }
 

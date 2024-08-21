@@ -58,6 +58,7 @@ CheckpointSigIntHandler::enable()
 // setup handler for SIGINT
 //
 {
+#ifndef _WIN32 // TODO: implement process signalling on windows
     struct sigaction newSigIntAction;
     std::memset(&newSigIntAction, 0, sizeof(newSigIntAction));
 
@@ -73,6 +74,8 @@ CheckpointSigIntHandler::enable()
         scene_rdl2::logging::Logger::fatal("setup new SIGINT handler for checkpoint-dump failed.");
         exit(EXIT_FAILURE);
     }
+
+#endif
 
     if (!ProcKeeper::get()->openWriteProgressFile()) {
         scene_rdl2::logging::Logger::fatal("writeProgressFile open failed.");
@@ -96,6 +99,8 @@ CheckpointSigIntHandler::disable()
         scene_rdl2::logging::Logger::fatal("writeProgressFile close failed.");
     }
 
+#ifndef _WIN32 // TODO: implement process signalling on windows
+
     struct sigaction newSigIntAction;
     std::memset(&newSigIntAction, 0, sizeof(newSigIntAction));
 
@@ -106,6 +111,7 @@ CheckpointSigIntHandler::disable()
         scene_rdl2::logging::Logger::fatal("fall back to default SIGINT handler failed.");
         exit(EXIT_FAILURE);
     }
+#endif
 }
 
 // static function

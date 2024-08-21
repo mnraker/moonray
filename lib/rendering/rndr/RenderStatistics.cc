@@ -30,8 +30,14 @@
 #include <ctime>
 #include <iomanip>
 #include <fstream>
+#ifndef _MSC_VER
 #include <sys/param.h>
 #include <unistd.h>
+#else
+#include <direct.h>
+#define MAXPATHLEN 4096
+#define PATH_MAX MAXPATHLEN
+#endif
 
 #ifndef HOST_NAME_MAX
 # ifdef _POSIX_HOST_NAME_MAX
@@ -120,11 +126,18 @@ addLaneUtilization(moonray_stats::StatsTable<2> &table, const pbr::Statistics &p
 std::string
 getExecutablePath()
 {
+#ifndef _WIN32
     // readlink does not append '\0'
     char dest[PATH_MAX] = {0};
     if (readlink("/proc/self/exe", dest, PATH_MAX - 1) < 0) {
         throw std::runtime_error(std::string("Unable to get self path: ") + getErrorDescription());
     }
+#else
+    char dest[MAX_PATH];
+    if (GetModuleFileNameA(NULL, dest, MAX_PATH) == 0) {
+        throw std::runtime_error(std::string("Unable to get self path: ") + getErrorDescription());
+    }
+#endif
     return dest;
 }
 
@@ -154,6 +167,7 @@ RenderStats::RenderStats():
     mFrameStartUtilization = mProcessStats.getProcessUtilization();
 
     char hostName[HOST_NAME_MAX];
+#ifndef _MSC_VER
     if (gethostname(hostName, HOST_NAME_MAX) == 0) {
         mHostName = hostName;
     } else {
@@ -162,6 +176,18 @@ RenderStats::RenderStats():
     char curPath[MAXPATHLEN];
     getcwd(curPath, MAXPATHLEN);
     mCurPath = curPath;
+#else
+    DWORD bufCharCount = HOST_NAME_MAX;
+    if (GetComputerNameA(reinterpret_cast<LPSTR>(hostName), &bufCharCount) != 0) {
+        mHostName = hostName;
+    }
+    else {
+        mHostName = "N/A";
+    }
+    char curPath[MAXPATHLEN];
+    _getcwd(curPath, MAXPATHLEN);
+    mCurPath = curPath;
+#endif
 }
 
 
@@ -496,7 +522,7 @@ RenderStats::logRenderOptions(const RenderOptions& options, std::ostream& outs, 
 {
     const bool csvStream = format == OutputFormat::athenaCSV || format == OutputFormat::fileCSV;
 
-#ifndef __APPLE__  // TODO: Temporary, reimplement this
+#if !defined(__APPLE__) && !defined(_WIN32)  // TODO: Temporary, reimplement this
     util::CPUID cpuid;
 
     StatsTable<2> hardwareTable("Hardware Support");

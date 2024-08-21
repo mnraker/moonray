@@ -329,7 +329,7 @@ LineSegments::computeIntersectCurvature(const mcrt_common::Ray& ray,
     uint32_t id1, id2, id3;
     intersection.getIds(id1, id2, id3);
 
-    const uint vertexOffset = id1;
+    const uint32_t vertexOffset = id1;
 
     Vec3fa cv0, cv1;
     if (!isMotionBlurOn()) {

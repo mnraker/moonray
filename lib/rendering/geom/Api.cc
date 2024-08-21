@@ -152,6 +152,51 @@ validateAttr(const T& attr,
 }
 
 template <> bool
+validateAttr<scene_rdl2::rdl2::Bool>(const scene_rdl2::rdl2::Bool& attr,
+                                     const std::string& attrName,
+                                     const scene_rdl2::rdl2::Geometry* rdlGeometry) {
+    if (std::isnan((float)attr)) {
+        rdlGeometry->error("Primitive attribute ", attrName," has a nan value");
+        return false;
+    } else if (!std::isfinite((float)attr)) {
+        rdlGeometry->error("Primitive attribute ", attrName," has a infinite value");
+        return false;
+    } else {
+        return true;
+    }
+}
+
+template <> bool
+validateAttr<scene_rdl2::rdl2::Int>(const scene_rdl2::rdl2::Int& attr,
+                                    const std::string& attrName,
+                                    const scene_rdl2::rdl2::Geometry* rdlGeometry) {
+    if (std::isnan((float)attr)) {
+        rdlGeometry->error("Primitive attribute ", attrName," has a nan value");
+        return false;
+    } else if (!std::isfinite((float)attr)) {
+        rdlGeometry->error("Primitive attribute ", attrName," has a infinite value");
+        return false;
+    } else {
+        return true;
+    }
+}
+
+template <> bool
+validateAttr<scene_rdl2::rdl2::Long>(const scene_rdl2::rdl2::Long& attr,
+                                     const std::string& attrName,
+                                     const scene_rdl2::rdl2::Geometry* rdlGeometry) {
+    if (std::isnan((double)attr)) {
+        rdlGeometry->error("Primitive attribute ", attrName," has a nan value");
+        return false;
+    } else if (!std::isfinite((double)attr)) {
+        rdlGeometry->error("Primitive attribute ", attrName," has a infinite value");
+        return false;
+    } else {
+        return true;
+    }
+}
+
+template <> bool
 validateAttr<scene_rdl2::rdl2::Vec2f>(const scene_rdl2::rdl2::Vec2f& attr,
                                       const std::string& attrName,
                                       const scene_rdl2::rdl2::Geometry* rdlGeometry) {

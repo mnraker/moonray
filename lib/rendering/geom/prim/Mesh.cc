@@ -270,7 +270,7 @@ Mesh::createVelocityGrid(const float interiorBandwidth,
 }
 
 bool
-Mesh::faceHasAssignment(uint faceId)
+Mesh::faceHasAssignment(uint32_t faceId)
 {
     // check if the part this face belongs to has the material assigned
     int assignmentId =

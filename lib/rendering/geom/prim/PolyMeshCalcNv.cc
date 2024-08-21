@@ -161,13 +161,13 @@ TriMeshCalcNv::setupVFlink()
 {
     mVFlink.resize(mVCount);
     for (size_t fId = 0; fId < mFCount; ++fId) {
-        uint fv0Id = fId * 3;
-        uint fv1Id = fv0Id + 1;
-        uint fv2Id = fv0Id + 2;
+        uint32_t fv0Id = fId * 3;
+        uint32_t fv1Id = fv0Id + 1;
+        uint32_t fv2Id = fv0Id + 2;
 
-        uint v0Id = mFVid[fv0Id];
-        uint v1Id = mFVid[fv1Id];
-        uint v2Id = mFVid[fv2Id];
+        uint32_t v0Id = mFVid[fv0Id];
+        uint32_t v1Id = mFVid[fv1Id];
+        uint32_t v2Id = mFVid[fv2Id];
 
         mVFlink[v0Id].push_back(fId);
         mVFlink[v1Id].push_back(fId);
@@ -177,10 +177,10 @@ TriMeshCalcNv::setupVFlink()
 void
 TriMeshCalcNv::computeFn(size_t fId)
 {
-    uint baseId = fId * 3;
-    uint v0Id = mFVid[baseId    ];
-    uint v1Id = mFVid[baseId + 1];
-    uint v2Id = mFVid[baseId + 2];
+    uint32_t baseId = fId * 3;
+    uint32_t v0Id = mFVid[baseId    ];
+    uint32_t v1Id = mFVid[baseId + 1];
+    uint32_t v2Id = mFVid[baseId + 2];
 
     for (size_t t = 0; t < mMotionSampleCount; ++t) {
         Vec3f &v0 = mVtx[v0Id * mMotionSampleCount + t];
@@ -209,15 +209,15 @@ QuadMeshCalcNv::setupVFlink()
 {
     mVFlink.resize(mVCount);
     for (size_t fId = 0; fId < mFCount; ++fId) {
-        uint fv0Id = fId * 4;
-        uint fv1Id = fv0Id + 1;
-        uint fv2Id = fv0Id + 2;
-        uint fv3Id = fv0Id + 3;
+        uint32_t fv0Id = fId * 4;
+        uint32_t fv1Id = fv0Id + 1;
+        uint32_t fv2Id = fv0Id + 2;
+        uint32_t fv3Id = fv0Id + 3;
 
-        uint v0Id = mFVid[fv0Id];
-        uint v1Id = mFVid[fv1Id];
-        uint v2Id = mFVid[fv2Id];
-        uint v3Id = mFVid[fv3Id];
+        uint32_t v0Id = mFVid[fv0Id];
+        uint32_t v1Id = mFVid[fv1Id];
+        uint32_t v2Id = mFVid[fv2Id];
+        uint32_t v3Id = mFVid[fv3Id];
 
         mVFlink[v0Id].push_back(fId);
         mVFlink[v1Id].push_back(fId);
@@ -229,11 +229,11 @@ QuadMeshCalcNv::setupVFlink()
 void
 QuadMeshCalcNv::computeFn(size_t fId)
 {
-    uint baseId = fId * 4;
-    uint v0Id = mFVid[baseId    ];
-    uint v1Id = mFVid[baseId + 1];
-    uint v2Id = mFVid[baseId + 2];
-    uint v3Id = mFVid[baseId + 3];
+    uint32_t baseId = fId * 4;
+    uint32_t v0Id = mFVid[baseId    ];
+    uint32_t v1Id = mFVid[baseId + 1];
+    uint32_t v2Id = mFVid[baseId + 2];
+    uint32_t v3Id = mFVid[baseId + 3];
 
     for (size_t t = 0; t < mMotionSampleCount; ++t) {
         Vec3f &v0 = mVtx[v0Id * mMotionSampleCount + t];

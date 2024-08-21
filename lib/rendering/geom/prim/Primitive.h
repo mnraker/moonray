@@ -50,7 +50,7 @@ struct Fishtum;
 
 namespace geom {
 
-struct MotionBlurParams;
+class MotionBlurParams;
 
 namespace internal {
 

@@ -1485,7 +1485,7 @@ generatePatchCvs(const OpenSubdiv::Far::TopologyRefiner* refiner,
         std::vector<PatchCV>& patchCvs,
         std::vector<TextureCV>& textureCvs,
         bool requireUniformFix,
-        uint motionSampleCount)
+        uint32_t motionSampleCount)
 {
     // compute the total number of points we need to evaluate patchTable
     // we use local points around extraordinary features.
@@ -1696,7 +1696,7 @@ evalLimitSurface(const OpenSubdiv::Far::PatchTable* patchTable,
         VertexBuffer<Vec3f, InterleavedTraits>& surfaceDpdt,
         std::vector<DisplacementFootprint>& displacementFootprints,
         bool& hasBadDerivatives, bool requireUniformFix,
-        uint motionSampleCount)
+        uint32_t motionSampleCount)
 {
     // allocate tessellated vertex/index buffer to hold the evaluation result
     size_t tessellatedVertexCount = limitSurfaceSamples.size();
@@ -1737,12 +1737,21 @@ evalLimitSurface(const OpenSubdiv::Far::PatchTable* patchTable,
             const auto& cvIndices = patchTable->GetPatchVertices(*handle);
             patchTable->EvaluateBasis(*handle, uv[0], uv[1], pWeights,
                 duWeights, dvWeights, duuWeights, duvWeights, dvvWeights);
+#ifndef _MSC_VER
             Vec3fa pos[motionSampleCount];
             Vec3fa dpdu[motionSampleCount];
             Vec3fa dpdv[motionSampleCount];
             Vec3fa dpduu[motionSampleCount];
             Vec3fa dpduv[motionSampleCount];
             Vec3fa dpdvv[motionSampleCount];
+#else
+            std::vector<Vec3fa> pos(motionSampleCount);
+            std::vector<Vec3fa> dpdu(motionSampleCount);
+            std::vector<Vec3fa> dpdv(motionSampleCount);
+            std::vector<Vec3fa> dpduu(motionSampleCount);
+            std::vector<Vec3fa> dpduv(motionSampleCount);
+            std::vector<Vec3fa> dpdvv(motionSampleCount);
+#endif
             for (size_t t = 0; t < motionSampleCount; ++t) {
                 pos[t] = Vec3fa(0.0f);
                 dpdu[t] = Vec3fa(0.0f);
@@ -1869,8 +1878,13 @@ evalLimitSurface(const OpenSubdiv::Far::PatchTable* patchTable,
                     dstdv += dvWeights[j] * cv;
                 }
                 surfaceSt(i) = st;
+#ifndef _MSC_VER
                 Vec3f dpds[motionSampleCount];
                 Vec3f dpdt[motionSampleCount];
+#else
+                std::vector<Vec3f> dpds(motionSampleCount);
+                std::vector<Vec3f> dpdt(motionSampleCount);
+#endif
                 for (size_t t = 0; t < motionSampleCount; ++t) {
                     computePartialsWithRespect2Texture(dpdu[t], dpdv[t],
                         dstdu, dstdv, dpds[t], dpdt[t]);
@@ -2768,10 +2782,10 @@ OpenSubdivMesh::bakePosMap(int width, int height, int udim,
     const int faceVertexCount = 4; // tessellated mesh is always quads
     for (size_t faceId = 0; faceId < getTessellatedMeshFaceCount(); ++faceId) {
         // vertex ids of quad
-        const uint vid0 = mTessellatedIndices[faceVertexCount * faceId];
-        const uint vid1 = mTessellatedIndices[faceVertexCount * faceId + 1];
-        const uint vid2 = mTessellatedIndices[faceVertexCount * faceId + 2];
-        const uint vid3 = mTessellatedIndices[faceVertexCount * faceId + 3];
+        const uint32_t vid0 = mTessellatedIndices[faceVertexCount * faceId];
+        const uint32_t vid1 = mTessellatedIndices[faceVertexCount * faceId + 1];
+        const uint32_t vid2 = mTessellatedIndices[faceVertexCount * faceId + 2];
+        const uint32_t vid3 = mTessellatedIndices[faceVertexCount * faceId + 3];
 
         // texture coordinates for this quad
         Vec2f st0, st1, st2, st3;

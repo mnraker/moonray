@@ -195,7 +195,7 @@ protected:
             float vertexW1, float vertexW2, float vertexW3,
             const mcrt_common::Ray &ray) const;
 
-    bool faceHasAssignment(uint faceId);
+    bool faceHasAssignment(uint32_t faceId);
 
     template<typename T> void
     computeVaryingAttributeDerivatives(shading::TypedAttributeKey<T> key,

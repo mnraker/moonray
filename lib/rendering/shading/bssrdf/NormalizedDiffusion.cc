@@ -21,12 +21,18 @@
 
 #define BSSRDF_SAMPLE_UNIFORM 0
 
+#ifndef _MSC_VER
+#define __attribute_unused __attribute__((__unused__))
+#else
+#define __attribute_unused
+#endif
+
 using namespace scene_rdl2::math;
 
 namespace {
 
 // cdf for normalized diffusion, eq(11) in [1]
-finline float diffusionCDF(float r, float d) __attribute__((__unused__));
+finline float diffusionCDF(float r, float d) __attribute_unused;
 
 finline float diffusionCDF(float r, float d)
 {

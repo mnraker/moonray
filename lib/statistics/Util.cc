@@ -6,8 +6,10 @@
 
 #include "Util.h"
 
+#ifndef _MSC_VER
 #include <sys/ioctl.h>
 #include <unistd.h>
+#endif
 
 namespace moonray_stats {
 
@@ -39,6 +41,7 @@ std::pair<std::string, std::string> splitMiddle(const std::string& s)
 
 int computeWindowWidth()
 {
+#ifndef _MSC_VER
     // If attached to a terminal...
     if (isatty(STDOUT_FILENO)) {
         // Get the terminal width.
@@ -48,6 +51,9 @@ int computeWindowWidth()
     } else {
         return 72;
     }
+#else
+    return 72;
+#endif
 }
 
 std::string createDashTitle(std::string s)

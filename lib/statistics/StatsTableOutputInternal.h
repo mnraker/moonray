@@ -40,7 +40,7 @@ HeaderRowContainer<N> splitHeaders(const StringList<N>& basicHeaders)
     HeaderRowContainer<N> headers;
 
     if (std::any_of(basicHeaders.cbegin(), basicHeaders.cend(),
-                    [](const std::string& h) {
+                    [&maxHeaderLength](const std::string& h) {
                         return h.length() > maxHeaderLength;
                     })) {
         // Split headers into multiple lines

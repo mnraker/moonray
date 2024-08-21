@@ -41,8 +41,12 @@
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_for_each.h>
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(_WIN32)
 #include <malloc.h>    // malloc_trim
+#endif
+
+#ifdef _MSC_VER
+#define strtok_r strtok_s
 #endif
 
 namespace moonray {
@@ -1520,7 +1524,7 @@ GeometryManager::tessellate(scene_rdl2::rdl2::Layer* layer,
     tessellationTimer.stop();
     mOptions.stats.mTessellationTime += previousTessellationTime;
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(_WIN32)
     // return unused memory from malloc() arena to OS so process memory usage
     // stats are accurate
     malloc_trim(0);
@@ -1563,7 +1567,7 @@ void GeometryManager::updateAccelerator(const scene_rdl2::rdl2::Layer* layer,
             geometrySets, &g2s);
     }
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(_WIN32)
     // return unused memory from malloc() arena to OS so process memory usage
     // stats are accurate
     malloc_trim(0);

@@ -91,7 +91,9 @@ function(make_ispc_target target sources stubsDestination)
         ISPC_HEADER_SUFFIX _ispc_stubs.h
         ISPC_HEADER_DIRECTORY /${relBinDir}/${stubsDestination}
         ISPC_INSTRUCTION_SETS ${GLOBAL_ISPC_INSTRUCTION_SETS}
-	LINKER_LANGUAGE CXX
+        ISPC_ARCH ${GLOBAL_ISPC_ARCH}
+        ISPC_TARGET_OS ${GLOBAL_ISPC_TARGET_OS}
+        LINKER_LANGUAGE CXX
     )
 
     target_link_libraries(${target}
@@ -173,8 +175,12 @@ set(aovMatParser_cc ${BISON_${yaccTarget}_OUTPUT_SOURCE})
 set(aovMatParser_hh ${BISON_${yaccTarget}_OUTPUT_HEADER})
 
 set(lexTarget ${component}_lex)
+set(flex_compile_flags "-PaovMat_yy")
+if(IsWindowsPlatform)
+    set(flex_compile_flags "-PaovMat_yy --wincompat")    
+endif()
 flex_target(${lexTarget} core/AovMat.ll core/AovMatLexer.cc
-             COMPILE_FLAGS "-PaovMat_yy"
+             COMPILE_FLAGS ${flex_compile_flags}
 )
 set(aovMatLexer_cc ${FLEX_${lexTarget}_OUTPUTS})
 set(aovMatLexer_hh ${FLEX_${lexTarget}_OUTPUT_HEADER})
@@ -185,7 +191,7 @@ add_flex_bison_dependency(${lexTarget} ${yaccTarget})
 # create object files from sample points
 
 function(symbolsFromBinFilename binFile resultStart resultEnd)
-    if(IsDarwinPlatform)
+    if(IsDarwinPlatform OR IsWindowsPlatform)
         get_filename_component(base ${binFile} NAME_WLE)
         string(CONCAT start "_binary_" ${base} )
         string(CONCAT end "_binary_" ${base} "_len")
@@ -275,12 +281,19 @@ foreach(binFile ${binFiles})
     get_filename_component(baseName ${binFile} NAME_WLE)
     set(objFile sampler/${baseName}.o)
     set(srcFile sampler/${baseName}.c)
-
     if(IsDarwinPlatform)
         add_custom_command(
             OUTPUT  ${objFile}
             DEPENDS ${binFile}
             COMMAND xxd -i -n _binary_${baseName} "${binFile}" "${srcFile}" && cc -c "${srcFile}" -o "${objFile}")
+    elseif(IsWindowsPlatform)
+        set(objFile sampler/${baseName}.obj)
+        set(_srcFile ${baseName}.c)
+        add_custom_command(
+            OUTPUT  ${objFile}
+            DEPENDS ${binFile}
+            COMMAND C:/Users/alex.fuller/workspace/openmoonray/xxd -i -n _binary_${baseName} "${binFile}" "${_srcFile}" && cl /c "${_srcFile}"
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/sampler)
     else()
         add_custom_command(
             OUTPUT  ${objFile}
@@ -458,6 +471,10 @@ if(IsDarwinPlatform)
     set_target_properties(${component} PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
 endif()
 
+if(IsWindowsPlatform)
+    set_target_properties(${component} PROPERTIES LINK_FLAGS "/FORCE:UNRESOLVED")
+endif()
+
 # If at Dreamworks add a SConscript stub file so others can use this library.
 SConscript_Stub(${component})
 
@@ -466,6 +483,15 @@ Moonray_cxx_compile_definitions(${component})
 Moonray_cxx_compile_features(${component})
 Moonray_cxx_compile_options(${component})
 Moonray_link_options(${component})
+
+if(IsWindowsPlatform)
+    target_compile_definitions(${component}
+        PRIVATE
+            DWA_OPENDCX_EXPORTS=1      # Export symbols so it links with OpenDCX
+            YY_NO_UNISTD_H=1           # AovMatLexer includes unistd.h, this disables it
+            isatty=_isatty             # AovMatLexer isatty -> _isatty
+    )
+endif()
 
 # Address what appears to be a compiler bug causing the pbr unit test to crash for variant 7
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION STREQUAL "6.3.1")

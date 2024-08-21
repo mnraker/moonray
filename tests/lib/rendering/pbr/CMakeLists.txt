@@ -27,6 +27,8 @@ set_target_properties(${objLib} PROPERTIES
     ISPC_HEADER_SUFFIX _ispc_stubs.h
     ISPC_HEADER_DIRECTORY /${relBinDir}
     ISPC_INSTRUCTION_SETS ${GLOBAL_ISPC_INSTRUCTION_SETS}
+    ISPC_ARCH ${GLOBAL_ISPC_ARCH}
+    ISPC_TARGET_OS ${GLOBAL_ISPC_TARGET_OS}
     LINKER_LANGUAGE CXX
 )
 
@@ -117,6 +119,11 @@ Moonray_link_options(${target})
 if(IsDarwinPlatform)
     set_target_properties(${target} PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
 endif()
+
+if(IsWindowsPlatform)
+    set_target_properties(${target} PROPERTIES LINK_FLAGS "/FORCE:UNRESOLVED")
+endif()
+
 # ---------------------------------------------------
 # This test needs to load certain DSOs at runtime
 set(dsoTargets

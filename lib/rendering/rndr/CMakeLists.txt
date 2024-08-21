@@ -97,7 +97,16 @@ if(IsDarwinPlatform)
     set_target_properties(${component} PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
 endif()
 
-if (NOT IsDarwinPlatform)
+if(IsWindowsPlatform)
+    set_target_properties(${component} PROPERTIES LINK_FLAGS "/FORCE:UNRESOLVED")
+    target_compile_definitions(${component}
+        PRIVATE
+            DWA_OPENDCX_EXPORTS=1              # Export symbols so it links with OpenDCX
+            _ENABLE_EXTENDED_ALIGNED_STORAGE=1 # std::aligned_storage<Len, Align> with an extended alignment
+    )
+endif()
+
+if (NOT IsDarwinPlatform AND NOT IsWindowsPlatform)
     set(PlatformSpecificLibs atomic)
 endif()
 
@@ -108,7 +117,7 @@ target_link_libraries(${component}
         SceneRdl2::common_grid_util
         SceneRdl2::common_math
         SceneRdl2::scene_rdl2
-	SceneRdl2::render_cache
+        SceneRdl2::render_cache
         SceneRdl2::render_util
         ${PROJECT_NAME}::common_mcrt_util
         ${PROJECT_NAME}::common_mcrt_macros
@@ -119,6 +128,7 @@ target_link_libraries(${component}
         ${PROJECT_NAME}::rendering_geom
         ${PROJECT_NAME}::rendering_pbr
         ${PROJECT_NAME}::rendering_rt
+        ${PROJECT_NAME}::rendering_shading
         ${PROJECT_NAME}::statistics
         ${PROJECT_NAME}::texturing_sampler
         OpenImageIO::OpenImageIO

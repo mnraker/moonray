@@ -17,7 +17,12 @@ set(exportGroup ${PROJECT_NAME}Targets)
 # as part of rendering_shading lib, ( I guess )
 # -------------------------------------------------------------------
 
-add_library(shading_eval_ispc SHARED "")
+set(lib_type SHARED)
+if(IsWindowsPlatform)
+    set(lib_type STATIC)
+endif()
+
+add_library(shading_eval_ispc ${lib_type} "")
 add_library(${PROJECT_NAME}::shading_eval_ispc ALIAS shading_eval_ispc)
 
 # If we don't request the C++ linker, cmake-3.21 will complain about
@@ -53,6 +58,8 @@ set_target_properties(shading_eval_ispc PROPERTIES
     ISPC_HEADER_SUFFIX _ispc_stubs.h
     ISPC_HEADER_DIRECTORY /${relBinDir}
     ISPC_INSTRUCTION_SETS ${GLOBAL_ISPC_INSTRUCTION_SETS}
+    ISPC_ARCH ${GLOBAL_ISPC_ARCH}
+    ISPC_TARGET_OS ${GLOBAL_ISPC_TARGET_OS}
     # If we don't request the C++ linker, cmake will complain about
     # a missing variable CMAKE_ISPC_CREATE_SHARED_LIBRARY. This seems
     # to be a bug in CMake-3.23's ISPC support
@@ -78,6 +85,10 @@ target_link_libraries(shading_eval_ispc
 
 if(IsDarwinPlatform)
     set_target_properties(shading_eval_ispc PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
+endif()
+
+if(IsWindowsPlatform)
+    set_target_properties(shading_eval_ispc PROPERTIES LINK_FLAGS "/FORCE:UNRESOLVED")
 endif()
 
 # If at Dreamworks add a SConscript stub file so others can use this library.
@@ -119,7 +130,7 @@ install(TARGETS shading_eval_ispc
 # =====================================================================================
 # shading_ispc: component that shaders depend on to define shaders
 # =====================================================================================
-add_library(shading_ispc SHARED "")
+add_library(shading_ispc ${lib_type} "")
 add_library(${PROJECT_NAME}::shading_ispc ALIAS shading_ispc)
 
 # ----------------------------------------
@@ -206,6 +217,9 @@ function(make_ispc_target target sources stubsDestination)
         ISPC_HEADER_SUFFIX _ispc_stubs.h
         ISPC_HEADER_DIRECTORY /${relBinDir}/${stubsDestination}
         ISPC_INSTRUCTION_SETS ${GLOBAL_ISPC_INSTRUCTION_SETS}
+        ISPC_ARCH ${GLOBAL_ISPC_ARCH}
+        ISPC_TARGET_OS ${GLOBAL_ISPC_TARGET_OS}
+        LINKER_LANGUAGE CXX
     )
 
     set_property(TARGET ${target}
@@ -230,6 +244,10 @@ function(make_ispc_target target sources stubsDestination)
     Moonray_ispc_compile_options(${target})
     Moonray_link_options(${target})
 
+
+    if(IsWindowsPlatform)
+        set_target_properties(${target} PROPERTIES LINK_FLAGS "/FORCE:UNRESOLVED")
+    endif()
 
     # We need to create the destination directory for the ispc_stubs.h
     # files before building the objects
@@ -286,6 +304,9 @@ set_target_properties(eval_attribute_debug_hack_ispc PROPERTIES
     ISPC_HEADER_SUFFIX _ispc_stubs.h
     ISPC_HEADER_DIRECTORY /${relBinDir}
     ISPC_INSTRUCTION_SETS ${GLOBAL_ISPC_INSTRUCTION_SETS}
+    ISPC_ARCH ${GLOBAL_ISPC_ARCH}
+    ISPC_TARGET_OS ${GLOBAL_ISPC_TARGET_OS}
+    LINKER_LANGUAGE CXX
 )
 
 target_include_directories(eval_attribute_debug_hack_ispc
@@ -404,6 +425,10 @@ target_link_libraries(shading_ispc
 
 if(IsDarwinPlatform)
     set_target_properties(shading_ispc PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
+endif()
+
+if(IsWindowsPlatform)
+    set_target_properties(shading_ispc PROPERTIES LINK_FLAGS "/FORCE:UNRESOLVED")
 endif()
 
 get_target_property(objLibDeps_00 shading_ispc_00 DEPENDENCY)

@@ -5,7 +5,7 @@ cmake_minimum_required (VERSION 3.23.1)
 
 include(OMR_PackageVersion)  # Sets versionString, projectString and PACKAGE_NAME
 set(languages LANGUAGES CXX C)
-if(NOT CMAKE_XCODE_BUILD_SYSTEM)
+if(NOT CMAKE_XCODE_BUILD_SYSTEM AND ("${CMAKE_GENERATOR}" MATCHES "Make") OR ("${CMAKE_GENERATOR}" MATCHES "Ninja"))
     list(APPEND languages ISPC)
 endif()
 project(${projectString}
@@ -92,7 +92,7 @@ if(${Amorphous_FOUND})
     set(${PROJECT_NAME_UPPER}_BUILD_AMORPHOUS_VOLUME YES)
 endif()
 
-if(NOT IsDarwinPlatform)
+if(IsLinuxPlatform)
     find_package(Libatomic REQUIRED)
 endif()
 
@@ -165,7 +165,14 @@ endif()
 
 # Create include/${PACKAGE_NAME} link in the build directory for generated headers.
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/include)
-file(CREATE_LINK ../lib ${PROJECT_BINARY_DIR}/include/${PACKAGE_NAME} SYMBOLIC)
+if(IsWindowsPlatform)
+    # CMake on windows seems to not set the directory flag /d so we need to do it this way
+    file(TO_NATIVE_PATH "${PROJECT_BINARY_DIR}/include/${PACKAGE_NAME}" _dstDir)
+    file(TO_NATIVE_PATH "../lib" _srcDir)
+    execute_process(COMMAND cmd.exe /c mklink /d "${_dstDir}" "${_srcDir}")
+else()
+    file(CREATE_LINK ../lib ${PROJECT_BINARY_DIR}/include/${PACKAGE_NAME} SYMBOLIC)
+endif()
 
 include(${PROJECT_NAME}CompileDefinitions)
 include(${PROJECT_NAME}CompileFeatures)

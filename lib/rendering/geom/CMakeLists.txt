@@ -134,6 +134,19 @@ Moonray_cxx_compile_features(${component})
 Moonray_cxx_compile_options(${component})
 Moonray_link_options(${component})
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    target_compile_definitions(${component}
+        PRIVATE
+            _HAS_AUTO_PTR_ETC=1 # For older log4cplus
+    )
+    target_compile_options(${component}
+        PRIVATE
+            /UOPENVDB_USE_LOG4CPLUS # Disable openvdb from bringing in log4cplus for now, as it needs patching to support MSVC
+            /wd4083                 # pragma warning: push/pop/disable
+            /wd4616                 # pragma warning: warning number '1875' not a valid compiler warning
+    )
+endif()
+
 # -------------------------------------
 # Install the target and the export set
 # -------------------------------------

@@ -6,7 +6,12 @@ set(component deepfile)
 set(installIncludeDir ${PACKAGE_NAME}/deepfile)
 set(exportGroup ${PROJECT_NAME}Targets)
 
-add_library(${component} SHARED "")
+set(lib_type SHARED)
+if(IsWindowsPlatform)
+    set(lib_type STATIC)
+endif()
+
+add_library(${component} ${lib_type} "")
 add_library(Moonray::${component} ALIAS ${component})
 
 target_sources(${component}
@@ -60,6 +65,14 @@ Moonray_cxx_compile_definitions(${component})
 Moonray_cxx_compile_features(${component})
 Moonray_cxx_compile_options(${component})
 Moonray_link_options(${component})
+
+if(IsWindowsPlatform)
+    target_compile_definitions(${component}
+        PRIVATE
+            DWA_OPENDCX_EXPORTS=1
+    )
+    #set_property(TARGET ${component} PROPERTY WINDOWS_EXPORT_ALL_SYMBOLS 0)
+endif()
 
 # -------------------------------------
 # Install the target and the export set

@@ -3,6 +3,9 @@
 
 #pragma once
 
+#ifndef RENDERING_GEOM_PRIM_UTIL_H_
+#define RENDERING_GEOM_PRIM_UTIL_H_
+
 #include <moonray/rendering/bvh/shading/AttributeKey.h>
 #include <moonray/rendering/bvh/shading/Intersection.h>
 #include <moonray/rendering/bvh/shading/Xform.h>
@@ -230,3 +233,4 @@ getAttribute(const shading::Attributes* attributes,
 } // namespace geom
 } // namespace moonray
 
+#endif // RENDERING_GEOM_PRIM_UTIL_H_

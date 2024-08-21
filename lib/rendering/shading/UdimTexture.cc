@@ -26,8 +26,10 @@
 #include <tbb/parallel_for.h>
 #include <tbb/mutex.h>
 
-#include <dirent.h>
-#include <glob.h>
+#ifndef _MSC_VER
+    #include <dirent.h>
+    #include <glob.h>
+#endif
 #include <vector>
 #include <algorithm>
 

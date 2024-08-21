@@ -186,7 +186,7 @@ public:
                           ispc::COLOR_RAMP_CONTROL_SPACE_RGB);
     }
 
-    finline scene_rdl2::math::Color eval(const BsdfSlice &slice,
+    scene_rdl2::math::Color eval(const BsdfSlice &slice,
                              const scene_rdl2::math::Vec3f &wi,
                              float *pdf = NULL) const override;
 

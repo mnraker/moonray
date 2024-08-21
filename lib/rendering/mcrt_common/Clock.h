@@ -4,7 +4,7 @@
 /// @file Clock.h
 #pragma once
 
-#include <time.h>
+#include <chrono>
 
 namespace moonray {
 namespace mcrt_common {
@@ -36,10 +36,8 @@ public:
     }
 
     __forceinline Clock(int64_t *stat,
-                        bool startNow = true,
-                        clockid_t clkId = CLOCK_THREAD_CPUTIME_ID):
+                        bool startNow = true):
         mStat(stat),
-        mClkId(clkId),
         mStopped(true)
     {
         if (startNow) {
@@ -55,7 +53,7 @@ public:
     __forceinline void start()
     {
         if (mStat && mStopped) {
-            clock_gettime(mClkId, &mStart);
+            mStart = std::chrono::high_resolution_clock::now();
             mStopped = false;
         }
     }
@@ -63,11 +61,8 @@ public:
     __forceinline void stop()
     {
         if (mStat && !mStopped) {
-            struct timespec end;
-            clock_gettime(mClkId, &end);
-            const int64_t sdiff = end.tv_sec - mStart.tv_sec;
-            const int64_t nsdiff = end.tv_nsec - mStart.tv_nsec;
-            *mStat += sdiff * NSPERSEC + nsdiff;
+            std::chrono::time_point<std::chrono::high_resolution_clock> end = std::chrono::high_resolution_clock::now();
+            *mStat += std::chrono::duration_cast<std::chrono::nanoseconds>(end - mStart).count();
             mStopped = true;
         }
     }
@@ -75,8 +70,7 @@ public:
 private:
     static const int64_t NSPERSEC = 1000000000;
     int64_t *mStat; // inactive if null
-    clockid_t mClkId;
-    struct timespec mStart;
+    std::chrono::time_point<std::chrono::high_resolution_clock> mStart;
     bool mStopped;
 };
 

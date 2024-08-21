@@ -15,8 +15,10 @@
 #pragma once
 #include <scene_rdl2/render/util/Memory.h>
 #include <scene_rdl2/render/util/MiscUtils.h>
-#if __ARM_NEON__
+#if defined(__ARM_NEON__)
 #include <scene_rdl2/common/arm/emulation.h>
+#elif defined(_MSC_VER)
+#include <intrin.h>
 #else
 #include <x86intrin.h>
 #endif

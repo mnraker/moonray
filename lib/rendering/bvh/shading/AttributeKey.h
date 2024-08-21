@@ -19,6 +19,12 @@ using scene_rdl2::rdl2::attributeType;
 namespace moonray {
 namespace shading {
 
+#ifdef rendering_bvh_shading_EXPORTS
+	#define RENDERING_BVH_SHADING_API RDL2_DSO_EXPORT
+#else
+	#define RENDERING_BVH_SHADING_API RDL2_DSO_IMPORT
+#endif
+
 // A NORMAL preprocessor macro is defined as a result of
 // moonray/lib/rendering/pbr/core/AovMat.ll
 // We need to temporarily disable it to define our enum
@@ -93,13 +99,13 @@ protected:
     static finline bool hasDerivatives(AttributeKey key);
 
 private:
-    static tbb::mutex sRegisterMutex;
-    static std::vector<std::string> sKeyNames;
-    static std::vector<AttributeType> sKeyTypes;
-    static std::vector<size_t> sKeySizes;
-    static std::vector<int8_t> sHasDerivatives;
-    static std::map<std::pair<std::string, AttributeType>, int> sTable;
-    static int sNumKeys;
+    RENDERING_BVH_SHADING_API static tbb::mutex sRegisterMutex;
+    RENDERING_BVH_SHADING_API static std::vector<std::string> sKeyNames;
+    RENDERING_BVH_SHADING_API static std::vector<AttributeType> sKeyTypes;
+    RENDERING_BVH_SHADING_API static std::vector<size_t> sKeySizes;
+    RENDERING_BVH_SHADING_API static std::vector<int8_t> sHasDerivatives;
+    RENDERING_BVH_SHADING_API static std::map<std::pair<std::string, AttributeType>, int> sTable;
+    RENDERING_BVH_SHADING_API static int sNumKeys;
 };
 
 /// @class TypedAttributeKey
@@ -147,29 +153,29 @@ public:
     };
 
     // Standard attributes
-    static TypedAttributeKey<scene_rdl2::math::Vec2f> sSt;
-    static TypedAttributeKey<scene_rdl2::math::Vec2f> sUv;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec2f> sSt;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec2f> sUv;
     // hair coordinates for the point closest to it on the surface geo
-    static TypedAttributeKey<scene_rdl2::math::Vec2f> sClosestSurfaceST;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec2f> sClosestSurfaceST;
     // hair coordinates for the root of the hair fiber on surface geo
-    static TypedAttributeKey<scene_rdl2::math::Vec2f> sSurfaceST;
-    static TypedAttributeKey<scene_rdl2::math::Vec3f> sNormal;
-    static TypedAttributeKey<scene_rdl2::math::Vec3f> sRefP;
-    static TypedAttributeKey<scene_rdl2::math::Vec3f> sRefN;
-    static TypedAttributeKey<scene_rdl2::math::Vec3f> sdPds;
-    static TypedAttributeKey<scene_rdl2::math::Vec3f> sRefdPds;
-    static TypedAttributeKey<scene_rdl2::math::Vec3f> sdPdt;
-    static TypedAttributeKey<scene_rdl2::math::Vec3f> sVelocity;      // primitive specified velocity attribute
-    static TypedAttributeKey<scene_rdl2::math::Vec3f> sP0;            // P at first time step
-    static TypedAttributeKey<scene_rdl2::math::Vec3f> sAcceleration;  // primitive specified acceleration attribute
-    static TypedAttributeKey<scene_rdl2::math::Mat4f> sInstanceObjectTransform;
-    static TypedAttributeKey<scene_rdl2::math::Mat4f> sInstanceTransformLevel0;
-    static TypedAttributeKey<scene_rdl2::math::Mat4f> sInstanceTransformLevel1;
-    static TypedAttributeKey<scene_rdl2::math::Mat4f> sInstanceTransformLevel2;
-    static TypedAttributeKey<scene_rdl2::math::Mat4f> sInstanceTransformLevel3;
-    static TypedAttributeKey<scene_rdl2::math::Mat4f> sInstanceTransformLevel4;
-    static TypedAttributeKey<float> sScatterTag;
-    static TypedAttributeKey<float> sShadowRayEpsilon;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec2f> sSurfaceST;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec3f> sNormal;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec3f> sRefP;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec3f> sRefN;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec3f> sdPds;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec3f> sRefdPds;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec3f> sdPdt;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec3f> sVelocity;      // primitive specified velocity attribute
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec3f> sP0;            // P at first time step
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec3f> sAcceleration;  // primitive specified acceleration attribute
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Mat4f> sInstanceObjectTransform;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Mat4f> sInstanceTransformLevel0;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Mat4f> sInstanceTransformLevel1;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Mat4f> sInstanceTransformLevel2;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Mat4f> sInstanceTransformLevel3;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Mat4f> sInstanceTransformLevel4;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<float> sScatterTag;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<float> sShadowRayEpsilon;
     // sMotion is computed in postIntersect.  It contains
     // the instaneous velocity of the intersection point
     // in render space units per shutter interval. It accounts
@@ -177,20 +183,20 @@ public:
     // instancing, vertex slice information, and user supplied
     // velocity attributes.  It does not include relative camera
     // or projection motion.
-    static TypedAttributeKey<scene_rdl2::math::Vec3f> sMotion;
-    static TypedAttributeKey<scene_rdl2::math::Vec3f> sPolyVertices[MAX_NUM_POLYVERTICES];
-    static TypedAttributeKey<int> sNumPolyVertices;
-    static TypedAttributeKey<int> sPolyVertexType; // PolyVertexType
-    static TypedAttributeKey<int> sId;
-    static TypedAttributeKey<bool> sReversedNormals;
-    static TypedAttributeKey<bool> sExplicitShading;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec3f> sMotion;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<scene_rdl2::math::Vec3f> sPolyVertices[MAX_NUM_POLYVERTICES];
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<int> sNumPolyVertices;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<int> sPolyVertexType; // PolyVertexType
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<int> sId;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<bool> sReversedNormals;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<bool> sExplicitShading;
 
     // Screen space radius
-    static TypedAttributeKey<float> sMinDistance;
-    static TypedAttributeKey<float> sMinDistanceRadius;
-    static TypedAttributeKey<float> sMaxDistance;
-    static TypedAttributeKey<float> sMaxDistanceRadius;
-    static std::vector<TypedAttributeKey<float>> sScreenSpaceRadiusKeys;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<float> sMinDistance;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<float> sMinDistanceRadius;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<float> sMaxDistance;
+    RENDERING_BVH_SHADING_API static TypedAttributeKey<float> sMaxDistanceRadius;
+    RENDERING_BVH_SHADING_API static std::vector<TypedAttributeKey<float>> sScreenSpaceRadiusKeys;
 };
 
 /// @class AttributeKeyHash

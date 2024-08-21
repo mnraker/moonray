@@ -94,12 +94,16 @@ class CountingStream : public std::ostream
 public:
     static const char sRecordSeparator = CountingStreamBuf::sRecordSeparator;
 
+#ifndef _MSC_VER
     CountingStream() :
         std::ostream(),
         mBuf()
     {
         this->init(&mBuf);
     }
+#else
+    CountingStream();
+#endif
 
     std::size_t getWidth() const
     {

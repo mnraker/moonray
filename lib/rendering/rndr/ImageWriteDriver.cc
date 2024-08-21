@@ -14,14 +14,17 @@
 #include <scene_rdl2/render/util/StrUtil.h>
 #include <scene_rdl2/render/util/TimeUtil.h>
 
+#include <chrono>
 #include <cstdlib>              // getenv, EXIT_SUCCESS
 #include <iomanip>              // std::put_time
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(_WIN32)
 #include <malloc.h>             // malloc_trim
 #include <sys/sysinfo.h>        // sysinfo
 #endif
+#ifndef _WIN32
 #include <sys/types.h>          // getpid
 #include <unistd.h>             // getpid, gethostname
+#endif
 
 // This directive is used to dump all ImageWriteDriver related memory tracking information
 //#define DEBUG_MSG_MEMUSAGE
@@ -120,7 +123,7 @@ ImageWriteDriver::updateSnapshotData(ImageWriteCacheUqPtr& imageWriteCachePtr)
         mSnapshotData = std::move(imageWriteCachePtr);
         mSnapshotDataFreshness.start();
     }
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(_WIN32)
     malloc_trim(0); // Return unused memory from malloc() arena to OS
 #endif
 }
@@ -132,7 +135,7 @@ ImageWriteDriver::resetSnapshotData()
         std::lock_guard<std::mutex> lock(mSnapshotDataMutex);
         mSnapshotData.reset();
     }
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(_WIN32)
     malloc_trim(0); // Return unused memory from malloc() arena to OS
 #endif
 }
@@ -154,7 +157,7 @@ ImageWriteDriver::enqImageWriteCache(ImageWriteCacheUqPtr& imageWriteCachePtr) /
 
     mImageWriteCacheList.push_back(std::move(imageWriteCachePtr));
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(_WIN32)
     malloc_trim(0); // Return unused memory from malloc() arena to OS
 #endif
 #   ifdef DEBUG_MSG_MEMUSAGE
@@ -286,6 +289,7 @@ size_t
 ImageWriteDriver::getProcMemUsage()
 // Return current process memory size (rss size and not include vsize) for debug
 {
+#ifndef _WIN32
     std::ifstream stat_stream("/proc/self/stat", std::ios_base::in);
 
     std::string pid, comm, state, ppid, pgrp, session, tty_nr;
@@ -306,6 +310,9 @@ ImageWriteDriver::getProcMemUsage()
 
     // return vsize + rssByteSize;
     return rssByteSize;         // Only return rss size
+#else
+    return 0;
+#endif
 }
 
 std::string
@@ -416,8 +423,7 @@ ImageWriteDriver::threadMain(ImageWriteDriver* driver)
             driver->mThreadState = ThreadState::IDLE;
             if (!driver->mThreadShutdown) {
                 driver->mCvBoot.notify_one(); // nofity to RenderDriver::progressCheckpointRenderFrame()
-
-                usleep(1000); // 1000us = 1ms : wake up every 1ms and check ImageWriteCache
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
             } else {
                 // We are in the shutdown sequence and simply skip all CPU yield logic
             }

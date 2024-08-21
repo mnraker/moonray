@@ -7,13 +7,18 @@
 #include <moonray/rendering/mcrt_common/Util.h>
 #include <scene_rdl2/render/util/TimeUtil.h>
 
+#include <chrono>
 #include <iostream>
 #include <sstream>
 
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h> // getpid()
+#ifndef _WIN32
 #include <unistd.h>    // usleep(), getpid()
+#else
+#include <io.h>        // _commit(), replaces ::fsync()
+#endif
 
 // Enable debug messages regarding thread boot and write progress file information.
 //#define DEBUG_MSG
@@ -124,7 +129,7 @@ ProcKeeper::finishImageWrite()
         mMainTaskCancel = true;
 
         while (!mThreadShutdown && mRunState != RunState::WAIT) {
-            usleep(500); // 0.5ms
+            std::this_thread::sleep_for(std::chrono::microseconds(500)); // 0.5ms
         }
     }
     mImageWriteCache = nullptr;
@@ -262,8 +267,7 @@ ProcKeeper::main()
         if (updateTime.end() < maxIntervalSec) {
             updateWriteProgressFile(progressSymbol(mImageWriteCache));
         }
-
-        usleep(static_cast<int>(sleepIntervalSec * 1000000.0f));
+        std::this_thread::sleep_for(std::chrono::microseconds(static_cast<long long>(sleepIntervalSec * 1000000.0f)));
     }
 
     ostr.str("");
@@ -314,7 +318,11 @@ ProcKeeper::updateWriteProgressFile(const std::string &str) const
     if (::write(mImageWriteProgressFd, static_cast<const void *>(str.c_str()), str.size()) == -1) {
         return false;
     }
+#ifdef _MSC_VER
+    if (::_commit(mImageWriteProgressFd) == -1) return false;
+#else
     if (::fsync(mImageWriteProgressFd) == -1) return false;
+#endif
     return true;
 }
 
@@ -358,7 +366,7 @@ ProcKeeper::signalActionSceneContextDumpMain()
 
 #ifdef TEST_SCENE_CONTEXT_DUMP
     std::cerr << ">> ProcKeeper.cc signalActionSceneContextDumpMain()\n";
-    sleep(1);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 #endif // end TEST_SCENE_CONTEXT_DUMP
 
     _exit(EXIT_SUCCESS);

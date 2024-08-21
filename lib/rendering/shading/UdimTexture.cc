@@ -31,6 +31,8 @@
 #include <vector>
 #include <algorithm>
 
+#include <filesystem>
+
 namespace moonray {
 namespace shading {
 
@@ -94,22 +96,24 @@ getUdimFilenames(const std::string& filename,
                  std::vector<std::string>& filenames)
 {
     size_t udimPos = filename.find("<UDIM>");
-    const std::string pattern = filename.substr(0, udimPos) + "*";
-
-    glob_t glob_result;
-    memset(&glob_result, 0, sizeof(glob_result));
-
-    int return_value = glob(pattern.c_str(), GLOB_TILDE, NULL, &glob_result);
-    if(return_value != 0) {
-        globfree(&glob_result);
+    if (udimPos != std::string::npos) {
+        std::string baseFileName = filename.substr(0, udimPos);
+        const std::filesystem::path path(filename);
+        for (const auto& d : std::filesystem::directory_iterator(path.parent_path())) {
+            if (std::filesystem::is_regular_file(d.status()) || std::filesystem::is_symlink(d.status())) {
+                std::string foundFile = d.path().string();
+                if (baseFileName == (foundFile.substr(0, udimPos))) {
+                    filenames.push_back(foundFile);
+                }
+            }
+        }
+    }
+    else {
         return false;
     }
-
-    for(size_t i = 0; i < glob_result.gl_pathc; ++i) {
-        filenames.push_back(std::string(glob_result.gl_pathv[i]));
+    if (filenames.empty()) {
+        return false;
     }
-
-    globfree(&glob_result);
 
     return true;
 }

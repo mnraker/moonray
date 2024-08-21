@@ -25,6 +25,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_COOKTORRANCE_ENERGY_COMPENSATION_REFLECTIONALBEDO_H_
+#define RENDERING_SHADING_BSDF_COOKTORRANCE_ENERGY_COMPENSATION_REFLECTIONALBEDO_H_
+
 namespace moonray {
 namespace shading {
 
@@ -206,3 +209,4 @@ const float ReflectionAlbedo::mGGXOneMinusEavg[COMP] = {
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSDF_COOKTORRANCE_ENERGY_COMPENSATION_REFLECTIONALBEDO_H_

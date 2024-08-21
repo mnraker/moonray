@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_HAIR_BSDFHAIRDIFFUSE_H_
+#define RENDERING_SHADING_BSDF_HAIR_BSDFHAIRDIFFUSE_H_
+
 #include <moonray/rendering/shading/bsdf/Bsdf.h>
 
 //#include <moonray/rendering/shading/ispc/bsdf/hair/BsdfHair_ispc_stubs.h>
@@ -93,4 +96,4 @@ protected:
 } // namespace shading
 } // namespace moonray
 
-
+#endif // RENDERING_SHADING_BSDF_HAIR_BSDFHAIRDIFFUSE_H_

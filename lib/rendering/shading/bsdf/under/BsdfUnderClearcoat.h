@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_BSDFUNDERCLEARCOAT_H_
+#define RENDERING_SHADING_BSDF_BSDFUNDERCLEARCOAT_H_
+
 #include "BsdfUnder.h"
 
 #include <scene_rdl2/common/math/Color.h>
@@ -125,3 +128,4 @@ protected:
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSDF_BSDFUNDERCLEARCOAT_H_

@@ -21,6 +21,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_COOKTORRANCE_ENERGY_COMPENSATION_COOKTORRANCEENERGYCOMPENSATION_H_
+#define RENDERING_SHADING_BSDF_COOKTORRANCE_ENERGY_COMPENSATION_COOKTORRANCEENERGYCOMPENSATION_H_
+
 #include <scene_rdl2/common/math/Color.h>
 #include <scene_rdl2/common/math/Vec3.h>
 #include <scene_rdl2/common/math/ReferenceFrame.h>
@@ -61,3 +64,4 @@ public:
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSDF_COOKTORRANCE_ENERGY_COMPENSATION_COOKTORRANCEENERGYCOMPENSATION_H_

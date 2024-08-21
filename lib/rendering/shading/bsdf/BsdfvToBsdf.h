@@ -4,6 +4,9 @@
 /// @file BsdfvToBsdf.h
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_BSDFVTOBSDF_H_
+#define RENDERING_SHADING_BSDF_BSDFVTOBSDF_H_
+
 #include "Bsdf.h"
 
 namespace moonray {
@@ -19,3 +22,4 @@ Bsdf *BsdfvToBsdf(unsigned numBlocks, const Bsdfv *bsdfv,
 } // shading
 } // moonray
 
+#endif // RENDERING_SHADING_BSDF_BSDFVTOBSDF_H_

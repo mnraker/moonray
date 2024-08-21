@@ -3,6 +3,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_LIGHTSTAGE_H_
+#define RENDERING_SHADING_BSDF_LIGHTSTAGE_H_
+
 #include <scene_rdl2/common/math/Color.h>
 #include <scene_rdl2/common/math/Mat4.h>
 #include <scene_rdl2/common/math/Vec2.h>
@@ -126,3 +129,4 @@ private:
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSDF_LIGHTSTAGE_H_

@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_FRESNEL_H_
+#define RENDERING_SHADING_BSDF_FRESNEL_H_
+
 #include <moonray/rendering/shading/ispc/bsdf/Fresnel.hh>
 #include <moonray/rendering/shading/PbrValidity.h>
 #include "fabric/VelvetAlbedo.h"
@@ -975,3 +978,4 @@ averageFresnelReflectance(float neta,
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSDF_FRESNEL_H_

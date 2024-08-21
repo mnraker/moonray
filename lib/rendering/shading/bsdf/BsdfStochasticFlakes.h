@@ -7,6 +7,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_BSDFSTOCHASTICFLAKES_H_
+#define RENDERING_SHADING_BSDF_BSDFSTOCHASTICFLAKES_H_
+
 #include "Bsdf.h"
 #include "BsdfSlice.h"
 #include <moonray/rendering/shading/Util.h>
@@ -484,4 +487,4 @@ private:
 } // namespace shading
 } // namespace moonray
 
-
+#endif // RENDERING_SHADING_BSDF_BSDFSTOCHASTICFLAKES_H_

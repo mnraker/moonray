@@ -6,6 +6,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSSRDF_MULTILAYER_H_
+#define RENDERING_SHADING_BSSRDF_MULTILAYER_H_
+
 #include "Bssrdf.h"
 
 #include <scene_rdl2/common/math/Color.h>
@@ -64,3 +67,4 @@ private:
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSSRDF_MULTILAYER_H_

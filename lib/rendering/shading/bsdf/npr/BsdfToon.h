@@ -11,6 +11,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_NPR_BSDFTOON_H_
+#define RENDERING_SHADING_BSDF_NPR_BSDFTOON_H_
+
 #include <moonray/rendering/shading/bsdf/BsdfLambert.h>
 #include <moonray/rendering/shading/Util.h>
 #include <moonray/rendering/shading/RampControl.h>
@@ -202,3 +205,4 @@ private:
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSDF_NPR_BSDFTOON_H_

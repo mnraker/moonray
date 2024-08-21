@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_BSDFRETROREFLECTION_H_
+#define RENDERING_SHADING_BSDF_BSDFRETROREFLECTION_H_
+
 #include <moonray/rendering/shading/Util.h>
 #include "Bsdf.h"
 #include "BsdfSlice.h"
@@ -193,4 +196,4 @@ ISPC_UTIL_TYPEDEF_STRUCT(RetroreflectionBsdfLobe, RetroreflectionBsdfLobev);
 } // namespace shading
 } // namespace moonray
 
-
+#endif // RENDERING_SHADING_BSDF_BSDFRETROREFLECTION_H_

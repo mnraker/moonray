@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_FABRIC_BSDFFABRIC_H_
+#define RENDERING_SHADING_BSDF_FABRIC_BSDFFABRIC_H_
+
 #include <moonray/rendering/shading/bsdf/Bsdf.h>
 #include <moonray/rendering/shading/bsdf/BsdfSlice.h>
 #include <moonray/rendering/shading/Util.h>
@@ -326,3 +329,4 @@ ISPC_UTIL_TYPEDEF_STRUCT(FabricVelvetBsdfLobe, FabricVelvetBsdfLobev);
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSDF_FABRIC_BSDFFABRIC_H_

@@ -4,7 +4,8 @@
 
 #pragma once
 
-
+#ifndef RENDERING_RNDR_RENDERSTATISTICS_H_
+#define RENDERING_RNDR_RENDERSTATISTICS_H_
 
 #include "RenderOptions.h"
 #include <moonray/rendering/rndr/statistics/ArrasLogStream.h>
@@ -569,3 +570,4 @@ struct RealtimeFrameStats
 } // namespace rndr
 } // namespace moonray
 
+#endif // RENDERING_RNDR_RENDERSTATISTICS_H_

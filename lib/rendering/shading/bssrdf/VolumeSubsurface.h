@@ -16,6 +16,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSSRDF_VOLUMESUBSURFACE_H_
+#define RENDERING_SHADING_BSSRDF_VOLUMESUBSURFACE_H_
+
 namespace moonray {
 namespace shading {
 
@@ -201,3 +204,4 @@ createVolumeSubsurface(scene_rdl2::alloc::Arena* arena,
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSSRDF_VOLUMESUBSURFACE_H_

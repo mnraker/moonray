@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_BSDFORENNAYAR_H_
+#define RENDERING_SHADING_BSDF_BSDFORENNAYAR_H_
+
 #include "Bsdf.h"
 #include "BsdfSlice.h"
 #include <moonray/rendering/shading/PbrValidity.h>
@@ -223,3 +226,4 @@ ISPC_UTIL_TYPEDEF_STRUCT(OrenNayarBsdfLobe, OrenNayarBsdfLobev);
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSDF_BSDFORENNAYAR_H_

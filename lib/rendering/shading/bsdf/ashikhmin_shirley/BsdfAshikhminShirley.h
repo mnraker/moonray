@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_ASHIKHMINSHIRLEY_BSDFASHIKHMINSHIRLEY_H_
+#define RENDERING_SHADING_BSDF_ASHIKHMINSHIRLEY_BSDFASHIKHMINSHIRLEY_H_
+
 #include <moonray/rendering/shading/bsdf/Bsdf.h>
 #include <moonray/rendering/shading/bsdf/BsdfSlice.h>
 #include <moonray/rendering/shading/Util.h>
@@ -158,4 +161,4 @@ ISPC_UTIL_TYPEDEF_STRUCT(AshikhminShirleyGlossyBsdfLobe, AshikhminShirleyGlossyB
 } // namespace shading
 } // namespace moonray
 
-
+#endif // RENDERING_SHADING_BSDF_ASHIKHMINSHIRLEY_BSDFASHIKHMINSHIRLEY_H_

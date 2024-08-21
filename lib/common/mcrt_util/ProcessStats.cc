@@ -5,7 +5,9 @@
 
 #include "ProcessStats.h"
 
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #ifdef __APPLE__
 #include <libproc.h>
 #include <mach/mach_time.h>
@@ -18,7 +20,7 @@ namespace util {
 int64
 ProcessUtilization::getUserSeconds(const ProcessUtilization &start) const
 {
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(_WIN32)
     return (this->userTime - start.userTime) / 1E9; // Nano to Sec
 #else
     return (this->userTime - start.userTime) / sysconf(_SC_CLK_TCK);
@@ -28,7 +30,7 @@ ProcessUtilization::getUserSeconds(const ProcessUtilization &start) const
 int64
 ProcessUtilization::getSystemSeconds(const ProcessUtilization &start) const
 {
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(_WIN32)
     return (this->systemTime - start.systemTime) / 1E9; // Nano to Sec
 #else
     return (this->systemTime - start.systemTime) / sysconf(_SC_CLK_TCK);
@@ -37,7 +39,7 @@ ProcessUtilization::getSystemSeconds(const ProcessUtilization &start) const
 
 ProcessStats::ProcessStats()
 {
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(_WIN32)
     // Don't need to try to open /proc
 #else
     mStatmFile.open("/proc/self/statm");
@@ -53,7 +55,7 @@ ProcessStats::getBytesRead() const
     std::string inStr;
     int64  bytesRead = 0;
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(_WIN32)
 
     // TODO: figure a way to gets the process bytes read
 
@@ -81,7 +83,7 @@ ProcessStats::getProcessMemory() const
 {
     int64 currentMemoryUsage = 0;
 
-#ifdef __APPLE__
+#if defined(__APPLE__)
 
     pid_t pid;
     struct proc_taskinfo info;
@@ -96,6 +98,7 @@ ProcessStats::getProcessMemory() const
     }
     mMemoryReadMutex.unlock();
 
+#elif defined(_WIN32)
 #else
 
     mMemoryReadMutex.lock();
@@ -132,7 +135,7 @@ ProcessStats::getProcessUtilization() const
     ProcessUtilization result;
     std::string inStr;
 
-#ifdef __APPLE__
+#if defined(__APPLE__)
 
     pid_t pid;
     struct proc_taskinfo info;
@@ -151,6 +154,7 @@ ProcessStats::getProcessUtilization() const
     }
     mSystemUtilMutex.unlock();
 
+#elif defined(_WIN32)
 #else
 
     mSystemUtilMutex.lock();

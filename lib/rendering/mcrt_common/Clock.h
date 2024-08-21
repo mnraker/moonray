@@ -4,7 +4,11 @@
 /// @file Clock.h
 #pragma once
 
+#if __cplusplus >= 201703L
+#include <chrono>
+#else
 #include <time.h>
+#endif
 
 namespace moonray {
 namespace mcrt_common {
@@ -35,6 +39,17 @@ public:
         return static_cast<int64_t>(sec * NSPERSEC);
     }
 
+#if __cplusplus >= 201703L
+    __forceinline Clock(int64_t *stat,
+                        bool startNow = true):
+        mStat(stat),
+        mStopped(true)
+    {
+        if (startNow) {
+            start();
+        }
+    }
+#else
     __forceinline Clock(int64_t *stat,
                         bool startNow = true,
                         clockid_t clkId = CLOCK_THREAD_CPUTIME_ID):
@@ -46,6 +61,7 @@ public:
             start();
         }
     }
+#endif
 
     __forceinline ~Clock()
     {
@@ -55,7 +71,11 @@ public:
     __forceinline void start()
     {
         if (mStat && mStopped) {
+#if __cplusplus >= 201703L
+            mStart = std::chrono::high_resolution_clock::now();
+#else
             clock_gettime(mClkId, &mStart);
+#endif
             mStopped = false;
         }
     }
@@ -63,11 +83,16 @@ public:
     __forceinline void stop()
     {
         if (mStat && !mStopped) {
+#if __cplusplus >= 201703L
+            std::chrono::time_point<std::chrono::high_resolution_clock> end = std::chrono::high_resolution_clock::now();
+            *mStat += std::chrono::duration_cast<std::chrono::nanoseconds>(end - mStart).count();
+#else
             struct timespec end;
             clock_gettime(mClkId, &end);
             const int64_t sdiff = end.tv_sec - mStart.tv_sec;
             const int64_t nsdiff = end.tv_nsec - mStart.tv_nsec;
             *mStat += sdiff * NSPERSEC + nsdiff;
+#endif
             mStopped = true;
         }
     }
@@ -75,8 +100,12 @@ public:
 private:
     static const int64_t NSPERSEC = 1000000000;
     int64_t *mStat; // inactive if null
+#if __cplusplus >= 201703L
+    std::chrono::time_point<std::chrono::high_resolution_clock> mStart;
+#else
     clockid_t mClkId;
     struct timespec mStart;
+#endif
     bool mStopped;
 };
 

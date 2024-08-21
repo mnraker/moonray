@@ -15,8 +15,10 @@
 #pragma once
 #include <scene_rdl2/render/util/Memory.h>
 #include <scene_rdl2/render/util/MiscUtils.h>
-#if __ARM_NEON__
+#if defined(__ARM_NEON__)
 #include <scene_rdl2/common/arm/emulation.h>
+#elif defined(_MSC_VER)
+#include <intrin.h>
 #else
 #include <x86intrin.h>
 #endif
@@ -64,7 +66,7 @@ struct Accumulator;
 struct ThreadLocalAccumulator;
 
 extern bool gAccumulatorsActive;
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(_WIN32)
 MNRY_DURING_ASSERTS(extern alignas(CACHE_LINE_SIZE) std::atomic_int gNumAccumulatorsActive);
 #else
 MNRY_DURING_ASSERTS(extern std::atomic_int gNumAccumulatorsActive);

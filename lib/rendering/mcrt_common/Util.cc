@@ -2,12 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //
-#include "Util.h"
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <boost/stacktrace.hpp>
+#else
 #include <execinfo.h>  // backtrace
-#include <tbb/mutex.h>
 #include <sys/syscall.h>
+#endif
+
+#include "Util.h"
+
+#include <tbb/mutex.h>
 
 #include <cstring>
+
+#if __cplusplus >= 201703L
+#include <chrono>
+#include <thread>
+#endif
 
 namespace moonray {
 namespace mcrt_common {
@@ -15,7 +28,11 @@ namespace mcrt_common {
 void
 threadSleep()
 {
+#if __cplusplus >= 201703L
+    std::this_thread::sleep_for(std::chrono::microseconds(500));
+#else
     usleep(500);
+#endif
 }
 
 void
@@ -28,7 +45,11 @@ void
 debugPrintThreadID(const char *contextString)
 {
     if (!contextString) contextString = "-- Thread ID = ";
+#if __cplusplus >= 201703L
+    std::thread::id tid = std::this_thread::get_id();
+#else
     pid_t tid = syscall(SYS_gettid);
+#endif
 
     // This printing is thread safe.
     std::printf("%s%d\n", contextString, tid);
@@ -41,6 +62,13 @@ debugPrintCallstack(const char *contextString)
     static tbb::mutex mutex;
 
     mutex.lock();
+
+#if defined(_WIN32)
+
+    std::printf("%s\n", boost::stacktrace::stacktrace());
+    std::fflush(stdout);
+
+#else
 
     if (!contextString) contextString = "-- Callstack:\n";
     std::printf("%s\n", contextString);
@@ -69,6 +97,8 @@ debugPrintCallstack(const char *contextString)
     std::fflush(stdout);
 
     free(strings);
+
+#endif
 
     mutex.unlock();
 }

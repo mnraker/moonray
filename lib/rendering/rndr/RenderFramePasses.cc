@@ -28,7 +28,7 @@
 #include <moonray/rendering/pbr/sampler/PixelScramble.h>
 
 #include <scene_rdl2/common/math/Color.h>
-#ifndef PLATFORM_APPLE
+#if !defined(PLATFORM_APPLE) && !defined(PLATFORM_WINDOWS)
 #include <scene_rdl2/render/util/CpuSocketUtil.h>
 #endif
 #include <scene_rdl2/render/util/ThreadPoolExecutor.h>
@@ -57,6 +57,13 @@
 // In order to activate debugSamplesRecArray mode, you should check Film.cc and
 // do "grep mDebugSamplesRecArray.reset()"
 //#define DEBUG_SAMPLE_REC_MODE
+
+#include <algorithm>
+
+#if __cplusplus >= 201703L
+#include <chrono>
+#include <thread>
+#endif
 
 namespace moonray {
 namespace rndr {
@@ -122,7 +129,7 @@ RenderDriver::renderPasses(RenderDriver *driver, const FrameState &fs,
 
     std::ostringstream ostr;
     ostr << "MOONRAY MCRT thread pool";
-#   ifndef PLATFORM_APPLE
+    #if !defined(PLATFORM_APPLE) && !defined(PLATFORM_WINDOWS)
     if (fs.mEnableMcrtCpuAffinity) {
         driver->mEnableMcrtCpuAffinity = true;
         if (fs.mNumRenderThreads == std::thread::hardware_concurrency()) {
@@ -153,7 +160,7 @@ RenderDriver::renderPasses(RenderDriver *driver, const FrameState &fs,
         }
     }
     scene_rdl2::ThreadPoolExecutor taskGroup(fs.mNumRenderThreads, calcCpuIdFunc);
-#   else // is PLATFORM_APPLE
+#   else // is PLATFORM_APPLE / PLATFORM_WINDOWS
     scene_rdl2::ThreadPoolExecutor taskGroup(fs.mNumRenderThreads, nullptr);
 #   endif // end ifndef PLATFORM_APPLE
 #   endif // end else TBB_MCRT_THREADPOOL
@@ -186,7 +193,7 @@ RenderDriver::renderPasses(RenderDriver *driver, const FrameState &fs,
     if (driver->mParallelInitFrameUpdate) {
         parallelInitFrameUpdateMinTileTotal =
             std::max(1UL,
-                     static_cast<size_t>(workQueue->getNumTiles()) / driver->mParallelInitFrameUpdateMcrtCount);
+                     static_cast<unsigned long>(workQueue->getNumTiles()) / driver->mParallelInitFrameUpdateMcrtCount);
         /* useful debug message
         std::cerr << ">> RenderFramePasses.cc init minTileTotal:" << parallelInitFrameUpdateMinTileTotal
                   << " mParallelInitFrameUpdateMcrtCount:" << driver->mParallelInitFrameUpdateMcrtCount << '\n';
@@ -236,10 +243,14 @@ RenderDriver::renderPasses(RenderDriver *driver, const FrameState &fs,
                 // about them constantly. Shortest context switching interval is around 10ms (I guess).
                 // So sometimes some threads need to wait extra 10ms or so to wake up from suspended condition.
                 // Obviously 10ms loss is big for realtime render case but this solution is a best result so far.
+                #if __cplusplus >= 201703L
+                std::this_thread::sleep_for(std::chrono::microseconds(1000));
+                #else
                 struct timespec tm;
                 tm.tv_sec = 0;
                 tm.tv_nsec = 1000; // 0.001ms : tested several different range but could not find any difference.
                 nanosleep(&tm, NULL); // yield CPU resource
+                #endif
             }
 
             double timeReady = scene_rdl2::util::getSeconds(); // get current time

@@ -158,8 +158,13 @@ float LightTree::splitAxis(SplitCandidate& minSplit, int axis, const LightTreeNo
     float bucketSize = range / NUM_BUCKETS;                 // size of each bucket
 
     // create buckets
+#ifndef _MSC_VER
     LightTreeBucket buckets[NUM_BUCKETS];
     SplitCandidate splits[numSplits];
+#else
+    std::vector<LightTreeBucket> buckets(NUM_BUCKETS);
+    std::vector<SplitCandidate> splits(numSplits);
+#endif
 
     // initialize split axes
     for (int i = 0; i < numSplits; ++i) {
@@ -183,6 +188,7 @@ float LightTree::splitAxis(SplitCandidate& minSplit, int axis, const LightTreeNo
     }
 
     // Purge empty buckets and splits
+#ifndef _MSC_VER
     LightTreeBucket finalBuckets[NUM_BUCKETS];
     SplitCandidate finalSplits[numSplits];
     int finalSplitCount = purgeEmptyBuckets(finalBuckets, finalSplits, buckets, splits, NUM_BUCKETS);
@@ -193,6 +199,18 @@ float LightTree::splitAxis(SplitCandidate& minSplit, int axis, const LightTreeNo
 
     // find lowest cost split candidate and return
     return getCheapestSplit(minSplit, finalSplitCount, finalSplits, node);
+#else
+    std::vector<LightTreeBucket> finalBuckets(NUM_BUCKETS);
+    std::vector<SplitCandidate> finalSplits(numSplits);
+    int finalSplitCount = purgeEmptyBuckets(&finalBuckets[0], &finalSplits[0], &buckets[0], &splits[0], NUM_BUCKETS);
+
+    // Populate the splits, left and right sides separately
+    populateSplitsLeftSide(&finalSplits[0], &finalBuckets[0], finalSplitCount);
+    populateSplitsRightSide(&finalSplits[0], &finalBuckets[0], finalSplitCount);
+
+    // find lowest cost split candidate and return
+    return getCheapestSplit(minSplit, finalSplitCount, &finalSplits[0], node);
+#endif
 }
 
 
@@ -394,8 +412,8 @@ void LightTree::printRecurse(uint32_t nodeIndex, int depth) const
         return;
     }
 
-    uint iL = nodeIndex + 1;
-    uint iR = node.getRightNodeIndex();
+    uint32_t iL = nodeIndex + 1;
+    uint32_t iR = node.getRightNodeIndex();
     std::cout << "\n";
 
     printRecurse(iL, depth+1);

@@ -22,6 +22,10 @@
 #include <cstdlib>
 #include <vector>
 
+#ifdef _MSC_VER
+#define __builtin_bswap32 _byteswap_ulong
+#endif
+
 namespace moonray {
 namespace pbr {
 

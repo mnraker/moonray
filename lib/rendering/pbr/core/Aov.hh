@@ -14,6 +14,13 @@
 #define SIZEOF_STD_VECTOR           24
 #define SIZEOF_VARIANCEAOVMAP       80
 #define AOV_SCHEMA_MEMBERS_PADDING  6
+#elif defined(_MSC_VER)
+#define SIZEOF_BGEXTRAAOVS          24
+#define SIZEOF_LPE_STATEMACHINE     8
+#define SIZEOF_LABELSUBSTITUTIONS   64
+#define SIZEOF_STD_VECTOR           24
+#define SIZEOF_VARIANCEAOVMAP       80
+#define AOV_SCHEMA_MEMBERS_PADDING  6
 #else
 #if STL_VERSION <= 4
 #define SIZEOF_BGEXTRAAOVS          24
@@ -27,8 +34,8 @@
 #define SIZEOF_LABELSUBSTITUTIONS   56
 #define SIZEOF_STD_VECTOR           24
 #define AOV_SCHEMA_MEMBERS_PADDING  6
-#endif
-#endif // __APPLE__
+#endif // STL_VERSION
+#endif // __APPLE__ _MSC_VER
 
 // The ispc code does not have access to the AovSchemaID enumeration.
 // Its getStateVar function is written using this enum

@@ -247,6 +247,8 @@ public:
         int            mStateAovId;
     };
 
+    MNRY_STATIC_ASSERT(sizeof(std::vector<Entry>) == SIZEOF_STD_VECTOR);
+
     // HUD validation
     static uint32_t hudValidation(bool verbose) { AOV_SCHEMA_VALIDATION; }
 
@@ -759,6 +761,7 @@ public:
         const BackgroundExtraAov &operator[](int i) const { return mAovs[i]; }
         BackgroundExtraAov mAovs[sNum] { { "U:bg_white", scene_rdl2::math::sWhite, -1 } };
     };
+    MNRY_STATIC_ASSERT(sizeof(BackgroundExtraAovs) == SIZEOF_BGEXTRAAOVS);
 
     // HUD validation
     static uint32_t hudValidation(bool verbose) { LIGHT_AOVS_VALIDATION; }

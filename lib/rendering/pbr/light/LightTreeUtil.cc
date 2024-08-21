@@ -139,13 +139,13 @@ float SplitCandidate::cost(const BBox3f& parentBBox, const LightTreeCone& parent
 }
 
 void SplitCandidate::performSplit(LightTreeNode& leftNode, LightTreeNode& rightNode, const Light* const* lights, 
-                                  std::vector<uint>& lightIndices, const LightTreeNode& parent)
+                                  std::vector<uint32_t>& lightIndices, const LightTreeNode& parent)
 {
     // sort lights on either side of axis
     const auto startIt = lightIndices.begin() + parent.getStartIndex();
     const auto endIt   = lightIndices.begin() + parent.getStartIndex() + parent.getLightCount();
     const float splitPlane = mAxis.second;
-    const auto splitFunc = [&](uint lightIndex) {
+    const auto splitFunc = [&](uint32_t lightIndex) {
         // Using < instead of <= here because lights that land on the split end 
         // up in the bucket above it (see splitAxis() where we populate buckets)
         return lights[lightIndex]->getPosition(0)[mAxis.first] < splitPlane;
@@ -153,10 +153,10 @@ void SplitCandidate::performSplit(LightTreeNode& leftNode, LightTreeNode& rightN
     const auto rightStartIt = std::partition(startIt, endIt, splitFunc);
 
     // create left and right child nodes
-    const uint lightCountLeft  = rightStartIt - startIt;
-    const uint lightCountRight = parent.getLightCount() - lightCountLeft;
-    const uint startIndexLeft  = parent.getStartIndex();
-    const uint startIndexRight = parent.getStartIndex() + lightCountLeft;
+    const uint32_t lightCountLeft  = rightStartIt - startIt;
+    const uint32_t lightCountRight = parent.getLightCount() - lightCountLeft;
+    const uint32_t startIndexLeft  = parent.getStartIndex();
+    const uint32_t startIndexRight = parent.getStartIndex() + lightCountLeft;
 
     // initialize nodes
     leftNode.init(startIndexLeft, mLeftEnergy, mLeftCone, mLeftBBox, lights, lightIndices, lightCountLeft);
@@ -167,11 +167,11 @@ void SplitCandidate::performSplit(LightTreeNode& leftNode, LightTreeNode& rightN
 
 /// ------------------------------------------- LightTreeNode ----------------------------------------------------------
 
-void LightTreeNode::calcEnergyVariance(uint lightCount, uint startIndex, const Light* const* lights, 
-                                       const std::vector<uint>& lightIndices)
+void LightTreeNode::calcEnergyVariance(uint32_t lightCount, uint32_t startIndex, const Light* const* lights, 
+                                       const std::vector<uint32_t>& lightIndices)
 {
     mEnergyMean = mEnergy / lightCount;
-    for (uint i = 0; i < lightCount; ++i) {
+    for (uint32_t i = 0; i < lightCount; ++i) {
         const Light* light = lights[lightIndices[startIndex + i]];
 
         float diff = luminance(light->getRadiance()) - mEnergyMean;
@@ -182,15 +182,15 @@ void LightTreeNode::calcEnergyVariance(uint lightCount, uint startIndex, const L
 }
 
 
-void LightTreeNode::init(uint lightCount, uint startIndex, const Light* const* lights, 
-                         const std::vector<uint>& lightIndices)
+void LightTreeNode::init(uint32_t lightCount, uint32_t startIndex, const Light* const* lights, 
+                         const std::vector<uint32_t>& lightIndices)
 {
     MNRY_ASSERT(lightCount > 0);
 
     mStartIndex = startIndex;
     mLightCount = lightCount;
 
-    for (uint i = 0; i < lightCount; ++i) {
+    for (uint32_t i = 0; i < lightCount; ++i) {
         const Light* light = lights[lightIndices[startIndex + i]];
 
         // add to the total energy
@@ -208,8 +208,8 @@ void LightTreeNode::init(uint lightCount, uint startIndex, const Light* const* l
     calcEnergyVariance(lightCount, startIndex, lights, lightIndices);
 }
 
-void LightTreeNode::init(uint startIndex, float energy, const LightTreeCone& cone, const BBox3f& bbox,
-                const Light* const* lights, const std::vector<uint>& lightIndices, uint lightCount)
+void LightTreeNode::init(uint32_t startIndex, float energy, const LightTreeCone& cone, const BBox3f& bbox,
+                const Light* const* lights, const std::vector<uint32_t>& lightIndices, uint32_t lightCount)
 {
     MNRY_ASSERT(lightCount > 0);
     
@@ -335,10 +335,10 @@ float LightTreeNode::calcMaterialTerm(const Vec3f& p, const Vec3f& n, bool cullL
     return scene_rdl2::math::abs(cosThetaIPrime);
 }
 
-void LightTreeNode::printLights(const std::vector<uint>& lightIndices)
+void LightTreeNode::printLights(const std::vector<uint32_t>& lightIndices)
 {
     std::cout << "{ ";
-    for (uint i = 0; i < mLightCount; ++i) {
+    for (uint32_t i = 0; i < mLightCount; ++i) {
         std::cout << lightIndices[mStartIndex + i] << ", ";
     }
     std::cout << "}\n";

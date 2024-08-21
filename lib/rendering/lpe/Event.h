@@ -11,11 +11,11 @@ namespace moonray {
 namespace lpe {
 
 enum EventType {
-    LPE_EVENT_TYPE_ENUMS()
+    LPE_EVENT_TYPE_ENUMS(EVENT)
 };
 
 enum EventScatteringType {
-    LPE_EVENT_SCATTERING_TYPE_ENUMS()
+    LPE_EVENT_SCATTERING_TYPE_ENUMS(EVENT)
 };
 
 const int sNoLabel = LPE_NO_LABEL;

@@ -8,11 +8,11 @@
 #include "Event.hh"
 
 enum LpeEventType {
-    LPE_EVENT_TYPE_ENUMS(LPE_)
+    LPE_EVENT_TYPE_ENUMS(LPE_EVENT)
 };
 
 enum LpeEventScatteringType {
-    LPE_EVENT_SCATTERING_TYPE_ENUMS(LPE_)
+    LPE_EVENT_SCATTERING_TYPE_ENUMS(LPE_EVENT)
 };
 
 static const uniform int LPE_noLabel = LPE_NO_LABEL;

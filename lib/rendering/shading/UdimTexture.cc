@@ -31,6 +31,10 @@
 #include <vector>
 #include <algorithm>
 
+#if __cplusplus >= 201703L
+    #include <filesystem>
+#endif
+
 namespace moonray {
 namespace shading {
 
@@ -94,6 +98,20 @@ getUdimFilenames(const std::string& filename,
                  std::vector<std::string>& filenames)
 {
     size_t udimPos = filename.find("<UDIM>");
+#if __cplusplus >= 201703L
+    if (udimPos != std::string::npos) {
+        std::string baseFileName = filename.substr(0, udimPos);
+        const std::filesystem::path path(filename);
+        for (const auto& d : std::filesystem::directory_iterator(path.parent_path())) {
+            if (std::filesystem::is_regular_file(d.status()) || std::filesystem::is_symlink(d.status())) {
+                std::string foundFile = d.path().stem().string();
+                if (baseFileName == (foundFile.substr(0, udimPos))) {
+                    filenames.push_back(foundFile);
+                }
+            }
+        }
+    }
+#else
     const std::string pattern = filename.substr(0, udimPos) + "*";
 
     glob_t glob_result;
@@ -110,6 +128,7 @@ getUdimFilenames(const std::string& filename,
     }
 
     globfree(&glob_result);
+#endif
 
     return true;
 }

@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
+#ifndef RENDERING_PBR_CORE_PBRTLSSTATE_H_
+#define RENDERING_PBR_CORE_PBRTLSSTATE_H_
+
 #include "PbrTLState.hh"
 
 #include "Statistics.h"
@@ -252,3 +255,4 @@ void heatMapBundledUpdate(TLState *pbrTls,
 } // namespace pbr
 } // namespace moonray
 
+#endif // RENDERING_PBR_CORE_PBRTLSSTATE_H_

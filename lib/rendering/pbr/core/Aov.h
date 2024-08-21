@@ -4,6 +4,9 @@
 // @file Aov.h
 #pragma once
 
+#ifndef RENDERING_PBR_CORE_AOV_H_
+#define RENDERING_PBR_CORE_AOV_H_
+
 #include "Aov.hh"
 #include <moonray/rendering/pbr/integrator/BsdfSampler.h>
 #include "RayState.h"
@@ -1002,3 +1005,4 @@ void aovAddToBundledQueueVolumeOnly(pbr::TLState *pbrTls,
 } // namespace pbr
 } // namespace moonray
 
+#endif // RENDERING_PBR_CORE_RAYSTATE_H_

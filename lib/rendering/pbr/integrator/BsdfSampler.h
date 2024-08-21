@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_PBR_INTEGRATOR_BSDFSAMPLER_H_
+#define RENDERING_PBR_INTEGRATOR_BSDFSAMPLER_H_
+
 #include <moonray/rendering/pbr/core/PbrTLState.h>
 #include <moonray/rendering/pbr/core/Util.h>
 #include <moonray/rendering/pbr/light/Light.h>
@@ -157,3 +160,4 @@ ISPC_UTIL_TYPEDEF_STRUCT(BsdfSample, BsdfSamplev)
 } // namespace pbr
 } // namespace moonray
 
+#endif // RENDERING_PBR_INTEGRATOR_BSDFSAMPLER_H_

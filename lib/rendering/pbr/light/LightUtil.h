@@ -4,6 +4,9 @@
 
 #pragma once
 
+#ifndef RENDERING_PBR_LIGHT_LIGHTUTIL_H_
+#define RENDERING_PBR_LIGHT_LIGHTUTIL_H_
+
 #include "LightUtil.hh"
 #include <moonray/rendering/pbr/sampler/IntegratorSample.h>
 
@@ -386,3 +389,4 @@ struct LightOccludeContext {
 } // namespace pbr
 } // namespace moonray
 
+#endif // RENDERING_PBR_LIGHT_LIGHTUTIL_H_

@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef RENDERING_PBR_LIGHT_LIGHTTREEUTIL_H_
+#define RENDERING_PBR_LIGHT_LIGHTTREEUTIL_H_
+
 #include "Light.h"
 #include "LightTree.hh"
 
@@ -265,3 +268,5 @@ private:
 
 } // end namespace pbr
 } // end namespace moonray
+
+#endif // RENDERING_PBR_LIGHT_LIGHTTREEUTIL_H_

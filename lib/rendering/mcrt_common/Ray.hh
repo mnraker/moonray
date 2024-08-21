@@ -86,9 +86,9 @@
                                          /* linux: 252 * 8 lanes = 2016  */\
 
 #if CACHE_LINE_SIZE == 128
-#define MCRT_COMMON_RAY_DIFFERENTIAL_MEMBERS_CACHE_PAD   (4)
+#define HVD_RAY_DIFFERENTIAL_MEMEBERS_CACHE_PAD ;HVD_ARRAY(uint32_t, pad1, (4))
 #else
-#define MCRT_COMMON_RAY_DIFFERENTIAL_MEMBERS_CACHE_PAD   0
+#define HVD_RAY_DIFFERENTIAL_MEMEBERS_CACHE_PAD
 #endif
 
 #define MCRT_COMMON_RAY_DIFFERENTIAL_MEMBERS                                    /*   size   macOS */\
@@ -96,8 +96,8 @@
     HVD_MEMBER(HVD_NAMESPACE(scene_rdl2::math, Vec3f), mDirX);                  /*    276    276  */\
     HVD_MEMBER(HVD_NAMESPACE(scene_rdl2::math, Vec3f), mOriginY);               /*    288    288  */\
     HVD_MEMBER(HVD_NAMESPACE(scene_rdl2::math, Vec3f), mDirY);                  /*    300    300  */\
-    HVD_MEMBER(float, mOrigTfar);                                               /*    304    304  */\
-    HVD_ARRAY(uint32_t, pad1, MCRT_COMMON_RAY_DIFFERENTIAL_MEMBERS_CACHE_PAD)   /*    304    320  */\
+    HVD_MEMBER(float, mOrigTfar)                                                /*    304    304  */\
+    HVD_RAY_DIFFERENTIAL_MEMEBERS_CACHE_PAD                                     /*    304    320  */\
                                                                   /* macOS: 320 * 4 lanes = 1280  */\
                                                                   /* linux: 304 * 8 lanes = 2432  */\
 

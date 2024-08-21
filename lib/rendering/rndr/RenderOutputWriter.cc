@@ -1572,6 +1572,8 @@ RenderOutputWriter::htof(const unsigned short h)
 	float output;
 	vst1q_f32(&output, vcvt_f32_f16(vld1_u16(&h)));
 	return output;
+#elif defined(_MSC_VER)
+    return _mm_cvtss_f32(_mm_cvtph_ps(_mm_set1_epi16(h)));
 #else
     return _cvtsh_ss(h); // Convert half 16bit float to full 32bit float
 #endif
@@ -1587,6 +1589,8 @@ RenderOutputWriter::ftoh(const float f)
 	__fp16 output;
 	vst1_f16(&output, vcvt_f16_f32(vld1q_f32(&f)));
 	return output;
+#elif defined(_MSC_VER)
+    return _mm_extract_epi16(_mm_cvtps_ph(_mm_set_ss(f), 0), 0);
 #else
     return _cvtss_sh(f, 0); // Convert full 32bit float to half 16bit float
                             // An immediate value controlling rounding using bits : 0=Nearest 

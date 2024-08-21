@@ -696,7 +696,7 @@ private:
     float                      mCachedDeepCurvatureTolerance;
     float                      mCachedDeepZTolerance;
     float                      mCachedTargetAdaptiveError;
-    uint                       mCachedDeepVolCompressionRes;
+    uint32_t                   mCachedDeepVolCompressionRes;
     std::vector<std::string>   mCachedDeepIDChannelNames;
     scene_rdl2::math::Viewport mCachedViewport;
     SamplingMode               mCachedSamplingMode;

@@ -26,6 +26,10 @@
 
 #include <scene_rdl2/render/util/Memory.h>
 
+#if defined(PLATFORM_WINDOWS)
+#define PATH_MAX 4096
+#endif
+
 #include <random>
 
 // Quick way to force a single sample per pixel. For debugging.

@@ -2455,7 +2455,7 @@ RenderContext::loadGeometries(const rt::ChangeFlag flag)
 
     timer.stop();
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(_WIN32)
     // return unused memory from malloc() arena to OS so process memory usage
     // stats are accurate
     malloc_trim(0);

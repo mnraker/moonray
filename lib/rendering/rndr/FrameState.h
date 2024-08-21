@@ -61,7 +61,7 @@ struct FrameState : public pbr::FrameState
     int                     mDeepFormat;
     float                   mDeepCurvatureTolerance;
     float                   mDeepZTolerance;
-    uint                    mDeepVolCompressionRes;
+    uint32_t                mDeepVolCompressionRes;
     std::vector<std::string> *mDeepIDChannelNames;
 
     float mFps; // The desired frames per second for RENDER_MODE_PROGRESSIVE and RENDER_MODE_REALTIME modes.

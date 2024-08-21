@@ -55,6 +55,7 @@ CheckpointSigIntHandler::enable()
 // setup handler for SIGINT
 //
 {
+#ifndef _WIN32 // TODO: implement process signalling on windows
     struct sigaction newSigIntAction;
     std::memset(&newSigIntAction, 0, sizeof(newSigIntAction));
 
@@ -70,6 +71,7 @@ CheckpointSigIntHandler::enable()
         scene_rdl2::logging::Logger::fatal("setup new SIGINT handler for checkpoint-dump failed.");
         exit(EXIT_FAILURE);
     }
+#endif
 
     // We need tmp directory projection for signal-based checkpointing.
     // We have to create DO_NOT_TMP_CLEAR file in the tmp directory with the proper expiration timestamp.
@@ -108,6 +110,8 @@ CheckpointSigIntHandler::disable()
     }
     if (!msg.empty()) scene_rdl2::logging::Logger::info(msg + '\n');    
 
+#ifndef _WIN32 // TODO: implement process signalling on windows
+
     struct sigaction newSigIntAction;
     std::memset(&newSigIntAction, 0, sizeof(newSigIntAction));
 
@@ -118,6 +122,7 @@ CheckpointSigIntHandler::disable()
         scene_rdl2::logging::Logger::fatal("fall back to default SIGINT handler failed.");
         exit(EXIT_FAILURE);
     }
+#endif
 }
 
 // static function

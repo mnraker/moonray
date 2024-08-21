@@ -18,15 +18,17 @@
 #include <errno.h>              // errno
 #include <fcntl.h>              // open
 #include <string.h>             // strerror
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(_WIN32)
 #include <malloc.h>             // malloc_trim
 #include <sys/sendfile.h>       // sendfile
-#else
+#elif defined(__APPLE__)
 #include <copyfile.h>           // copyfile
 #endif
 #include <sys/stat.h>           // fstat
 #include <sys/types.h>          // fstat
+#ifndef _WIN32
 #include <unistd.h>             // unlink, close, isatty
+#endif
 
 // for runtime verify of block data size calculation
 //#define RUNTIME_VERIFY_BLOCKDATASIZE
@@ -499,19 +501,28 @@ ImageWriteCacheTmpFileItem::copyFile(const std::string &dstName, std::string &er
 
     std::string copyDestName = genCopyDestName(dstName);
 
+#if !defined(_WIN32)
     int dstFd = open(copyDestName.c_str(), O_WRONLY | O_CREAT, 0666);
     if (dstFd < 0) {
         errMsg = scene_rdl2::util::buildString("Could not create copy destination file '",
                                    copyDestName.c_str(), "' ", strerror(errno));
         return false;
     }
+#endif
 
-#ifdef __APPLE__
+#if defined(__APPLE__)
     int result = fcopyfile(mTmpFileFd, dstFd, NULL,
                            COPYFILE_ACL|COPYFILE_STAT|COPYFILE_XATTR|COPYFILE_DATA);
     if (result == -1) {
         close(dstFd);
         errMsg = scene_rdl2::util::buildString("Failed tmpFile copy to destination location '",
+                                   copyDestName.c_str(), "' ", strerror(errno));
+        return false;
+    }
+#elif defined(_WIN32)
+    bool result = CopyFileA(mTmpFilename.c_str(), copyDestName.c_str(), false);
+    if (!result) {
+        errMsg = scene_rdl2::util::buildString("Could not get tmpFile size for '",
                                    copyDestName.c_str(), "' ", strerror(errno));
         return false;
     }
@@ -541,16 +552,20 @@ ImageWriteCacheTmpFileItem::copyFile(const std::string &dstName, std::string &er
     }
 #endif
 
+#if !defined(_WIN32)
     if (close(dstFd) == -1) {
         errMsg = scene_rdl2::util::buildString("Failed close file of '", copyDestName.c_str(), "' ",
                                    strerror(errno));
         return false;
     }
+#endif
 
 #   ifdef IMAGE_WRITE_DETAIL_MESSAGE
     std::string msg = scene_rdl2::util::buildString("Copied: tmpFile to '", copyDestName.c_str(), "'");
     scene_rdl2::logging::Logger::info(msg);
+#if !defined(_WIN32)
     if (isatty(STDOUT_FILENO)) std::cout << msg << std::endl;
+#endif
 #   endif // end IMAGE_WRITE_DETAIL_MESSAGE
 
     return true;
@@ -687,7 +702,7 @@ ImageWriteCache::freeInternalData()
 
     mImageWriteCacheSpecs.clear();
     mImageWriteCacheSpecs.shrink_to_fit();
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(_WIN32)
     malloc_trim(0); // Return unused memory from malloc() arena to OS
 #endif
 }

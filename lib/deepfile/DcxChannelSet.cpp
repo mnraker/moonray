@@ -10,6 +10,10 @@
 #include <algorithm> // for std::sort in some compilers
 #include <string.h> // for strcmp in some compilers
 
+#ifdef _MSC_VER 
+#define strcasecmp _stricmp
+#endif
+
 
 OPENDCX_INTERNAL_NAMESPACE_HEADER_ENTER
 

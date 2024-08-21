@@ -35,10 +35,14 @@
 #ifdef __INTEL_COMPILER
 // We don't need any include for half float instructions
 #else // else __INTEL_COMPILER
-#ifndef __ARM_NEON__
+#if !defined(__ARM_NEON__) && !defined(_MSC_VER)
 #include <x86intrin.h>          // _mm_cvtps_ph, _cvtph_ps : for GCC build
 #endif
 #endif // end else __INTEL_COMPILER
+
+#if __cplusplus >= 201703L
+#include <filesystem>
+#endif
 
 //#define SINGLE_THREAD_READ
 
@@ -54,6 +58,10 @@ auto freeChar = [](char *c) { free(c); };
 std::string
 realfile(const std::string &filename)
 {
+#if __cplusplus >= 201703L
+    std::filesystem::path p(filename);
+    return std::filesystem::absolute(p).string();
+#else
     std::unique_ptr<char, decltype(freeChar)>
         rp(realpath(filename.c_str(), nullptr), freeChar);
 
@@ -62,6 +70,7 @@ realfile(const std::string &filename)
     }
 
     return filename;
+#endif
 }
 
 } // namespace

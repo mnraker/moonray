@@ -4,6 +4,9 @@
 
 #pragma once
 
+#ifndef RENDERING_PBR_LIGHT_LIGHTACCELERATOR_H_
+#define RENDERING_PBR_LIGHT_LIGHTACCELERATOR_H_
+
 #include "Light.h"
 #include "LightAccelerator.hh"
 
@@ -58,3 +61,4 @@ typedef std::vector<LightAccelerator> LightAccList;
 } // namespace pbr
 } // namespace moonray
 
+#endif RENDERING_PBR_LIGHT_LIGHTACCELERATOR_H_

@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_PBR_INTEGRATOR_LIGHTSETSAMPLER_H_
+#define RENDERING_PBR_INTEGRATOR_LIGHTSETSAMPLER_H_
+
 #include <moonray/rendering/pbr/core/PbrTLState.h>
 #include <moonray/rendering/pbr/light/Light.h>
 #include <moonray/rendering/pbr/light/LightSet.h>
@@ -154,3 +157,4 @@ private:
 } // namespace pbr
 } // namespace moonray
 
+#endif // RENDERING_PBR_INTEGRATOR_LIGHTSETSAMPLER_H_

@@ -4,6 +4,9 @@
 
 #pragma once
 
+#ifndef RENDERING_PBR_LIGHT_LIGHT_H_
+#define RENDERING_PBR_LIGHT_LIGHT_H_
+
 #include "Light.hh"
 #include "LightUtil.h"
 #include <moonray/rendering/pbr/lightfilter/LightFilter.h>
@@ -467,3 +470,4 @@ private:
 } // namespace pbr
 } // namespace moonray
 
+#endif // RENDERING_PBR_LIGHT_LIGHT_H_

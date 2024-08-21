@@ -7,6 +7,10 @@
 ///
 
 #pragma once
+
+#ifndef RENDERING_PBR_CORE_STATISTICS_H_
+#define RENDERING_PBR_CORE_STATISTICS_H_
+
 #include <moonray/common/mcrt_util/Average.h>
 #include <scene_rdl2/common/platform/Platform.h>
 
@@ -118,4 +122,4 @@ public:
 } // namespace pbr
 } // namespace moonray
 
-
+#endif // RENDERING_PBR_CORE_STATISTICS_H_

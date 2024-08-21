@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_PBR_LIGHT_LIGHTSET_H_
+#define RENDERING_PBR_LIGHT_LIGHTSET_H_
+
 #include "Light.h"
 #include "LightAccelerator.h"
 #include "LightSet.hh"
@@ -137,3 +140,4 @@ private:
 } // namespace pbr
 } // namespace moonray
 
+#endif // RENDERING_PBR_LIGHT_LIGHTSET_H_

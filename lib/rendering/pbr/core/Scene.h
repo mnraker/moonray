@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_PBR_CORE_SCENE_H_
+#define RENDERING_PBR_CORE_SCENE_H_
+
 #include "Aov.h"
 #include <moonray/rendering/mcrt_common/ExecutionMode.h>
 #include <moonray/rendering/mcrt_common/Ray.h>
@@ -425,4 +428,4 @@ private:
 } // namespace pbr
 } // namespace moonray
 
-
+#endif // RENDERING_PBR_CORE_SCENE_H_

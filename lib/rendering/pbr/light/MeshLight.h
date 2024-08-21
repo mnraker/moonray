@@ -3,6 +3,10 @@
 
 
 #pragma once
+
+#ifndef RENDERING_PBR_LIGHT_MESHLIGHT_H_
+#define RENDERING_PBR_LIGHT_MESHLIGHT_H_
+
 #include "Light.h"
 
 #include <scene_rdl2/scene/rdl2/rdl2.h>
@@ -339,3 +343,4 @@ private:
 } // namespace pbr
 } // namespace moonray
 
+#endif RENDERING_PBR_LIGHT_MESHLIGHT_H_

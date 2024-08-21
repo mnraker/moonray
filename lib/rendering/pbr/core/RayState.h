@@ -4,6 +4,10 @@
 //
 //
 #pragma once
+
+#ifndef RENDERING_PBR_CORE_RAYSTATE_H_
+#define RENDERING_PBR_CORE_RAYSTATE_H_
+
 #include <moonray/rendering/pbr/Types.h>
 #include "RayState.hh"
 
@@ -102,3 +106,4 @@ decodeRayStatesInPlace(unsigned numEntries, shading::SortedRayState *srcDst)
 } // namespace pbr
 } // namespace moonray
 
+#endif // RENDERING_PBR_CORE_RAYSTATE_H_

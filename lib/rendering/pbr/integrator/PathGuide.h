@@ -4,6 +4,9 @@
 /// @file PathGuide.h
 #pragma once
 
+#ifndef RENDERING_PBR_INTEGRATOR_PATHGUIDE_H_
+#define RENDERING_PBR_INTEGRATOR_PATHGUIDE_H_
+
 #include <scene_rdl2/common/math/BBox.h>
 #include <scene_rdl2/common/math/Color.h>
 #include <scene_rdl2/common/math/Vec3.h>
@@ -69,3 +72,4 @@ private:
 } // namespace pbr
 } // namespace moonray
 
+#endif // RENDERING_PBR_INTEGRATOR_PATHGUIDE_H_

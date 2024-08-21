@@ -4,6 +4,9 @@
 //
 #pragma once
 
+#ifndef RENDERING_PBR_CORE_UTIL_H_
+#define RENDERING_PBR_CORE_UTIL_H_
+
 #include <scene_rdl2/common/math/Color.h>
 #include <scene_rdl2/common/math/Mat4.h>
 #include <scene_rdl2/common/math/Math.h>
@@ -383,3 +386,4 @@ isActive(int32_t lanemask, int i)
 } // namespace pbr
 } // namespace moonray
 
+#endif // RENDERING_PBR_CORE_UTIL_H_

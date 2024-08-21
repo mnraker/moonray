@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_GEOM_PRIM_POLYMESHCALCNV_H_
+#define RENDERING_GEOM_PRIM_POLYMESHCALCNV_H_
+
 #include <moonray/rendering/geom/PolygonMesh.h>
 
 namespace moonray {
@@ -91,3 +94,4 @@ private:
 } // namespace geom
 } // namespace moonray
 
+#endif // RENDERING_GEOM_PRIM_POLYMESHCALCNV_H_

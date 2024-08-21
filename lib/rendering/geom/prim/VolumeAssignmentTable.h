@@ -7,6 +7,9 @@
 
 #pragma once
 
+#ifndef RENDERING_GEOM_PRIM_VOLUMEASSIGNMENTTABLE_H_
+#define RENDERING_GEOM_PRIM_VOLUMEASSIGNMENTTABLE_H_
+
 #include <moonray/rendering/geom/prim/MotionTransform.h>
 #include <moonray/rendering/geom/prim/ShadowLinking.h>
 #include <moonray/rendering/geom/prim/VolumeRegions.h>
@@ -153,3 +156,4 @@ private:
 } // namespace geom
 } // namespace moonray
 
+#endif // RENDERING_GEOM_PRIM_VOLUMEASSIGNMENTTABLE_H_

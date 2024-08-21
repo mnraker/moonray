@@ -12,12 +12,18 @@
 #include <cstring>
 #include <utility>
 
+#ifndef _MSC_VER
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#else
+#include <scene_rdl2/common/platform/Endian.h> // brings in windows/winsock2
+#include <io.h>
+#include <ws2tcpip.h>
+#endif
 
 namespace moonray {
 namespace stats {
@@ -43,7 +49,11 @@ ListeningSocket::ListeningSocket(int port) :
     const int gairesult = getaddrinfo(nullptr, portstring, &hints, &result);
     if (gairesult != 0) {
         throw SocketException(std::string("Unable to get server information: ") +
+#ifndef _MSC_VER
                               gai_strerror(gairesult));
+#else
+                              gai_strerrorA(gairesult));
+#endif
     }
 
     addrinfo* rp;
@@ -149,7 +159,11 @@ Socket Socket::as_client(const std::string& hostname, int port)
     const int gairesult = getaddrinfo(hostname.c_str(), portstring, &hints, &result);
     if (gairesult != 0) {
         throw SocketException(std::string("Unable to get host address: ") +
+#ifndef _MSC_VER
                               gai_strerror(gairesult));
+#else
+                              gai_strerrorA(gairesult));
+#endif
     }
 
     addrinfo* rp;
@@ -245,7 +259,11 @@ ssize_t Socket::read(char* buf, ssize_t count)
 {
     ssize_t rc = 0;
     for ( ; ; ) {
+#ifndef _MSC_VER
         const ssize_t ret = ::read(mFD, buf + rc, count - rc);
+#else
+        const ssize_t ret = ::_read(mFD, buf + rc, count - rc);
+#endif
         if (ret >= 0) {
             return ret;
         } else {

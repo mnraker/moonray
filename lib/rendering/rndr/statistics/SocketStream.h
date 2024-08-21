@@ -13,7 +13,11 @@
 #include <stdexcept>
 #include <streambuf>
 #include <vector>
+#ifndef _MSC_VER
 #include <netinet/in.h>
+#else
+typedef int64_t ssize_t;
+#endif
 
 namespace moonray {
 namespace stats {

@@ -15,6 +15,8 @@
 #include <type_traits>
 
 #if defined(_MSC_FULL_VER)
+#define WIN32_LEAN_AND_MEAN
+#define VC_EXTRALEAN
 #include <windows.h>
 #elif defined (__ICC)
 #include <immintrin.h>

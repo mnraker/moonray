@@ -3,7 +3,7 @@
 
 #pragma once
 
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined(_MSC_VER)
 
 #include <array>
 #include <atomic>
@@ -12,7 +12,7 @@
 #include <mutex>
 #include <type_traits>
 
-#if defined(__WIN32__)
+#if _WIN32
 #include <intrin.h>
 #else
 #include <cpuid.h>
@@ -186,10 +186,17 @@ private:
 
     static std::string get_vendor()
     {
+#ifndef _MSC_VER
         std::array<unsigned, 4> cpuinfo;
         __get_cpuid(0, &cpuinfo[0], &cpuinfo[1], &cpuinfo[2], &cpuinfo[3]);
         const std::array<unsigned, 4> name = {cpuinfo[1], cpuinfo[3], cpuinfo[2], 0};
         return reinterpret_cast<const char *>(name.data());
+#else
+        std::array<int, 4> cpuinfo;
+        __cpuid(cpuinfo.data(), 0);
+        const std::array<int, 4> name = {cpuinfo[1], cpuinfo[3], cpuinfo[2], 0};
+        return reinterpret_cast<const char *>(name.data());
+#endif
     }
 
     static cpuid_detail::CPUFeatures get_cpu_features()

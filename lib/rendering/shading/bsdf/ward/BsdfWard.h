@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_WARD_BSDFWARD_H_
+#define RENDERING_SHADING_BSDF_WARD_BSDFWARD_H_
+
 #include <moonray/rendering/shading/bsdf/Bsdf.h>
 #include <moonray/rendering/shading/bsdf/BsdfSlice.h>
 #include <moonray/rendering/shading/ispc/bsdf/ward/BsdfWard_ispc_stubs.h>
@@ -230,4 +233,4 @@ ISPC_UTIL_TYPEDEF_STRUCT(WardOriginalBsdfLobe, WardOriginalBsdfLobev);
 } // namespace shading
 } // namespace moonray
 
-
+#endif // RENDERING_SHADING_BSDF_WARD_BSDFWARD_H_

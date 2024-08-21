@@ -3,6 +3,9 @@
 
 #pragma once
 
+#ifndef RENDERING_RNDR_ADAPTIVE_ACTIVEPIXELMASK_H_
+#define RENDERING_RNDR_ADAPTIVE_ACTIVEPIXELMASK_H_
+
 #include <scene_rdl2/common/fb_util/Tiler.h>
 
 #include <cstdint>
@@ -400,4 +403,4 @@ inline std::ostream& operator<<(std::ostream& outs, const ActivePixelMask& mask)
 } // namespace rndr
 } // namespace moonray
 
-
+#endif // RENDERING_RNDR_ADAPTIVE_ACTIVEPIXELMASK_H_

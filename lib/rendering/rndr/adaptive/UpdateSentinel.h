@@ -5,6 +5,9 @@
 
 #pragma once
 
+#ifndef RENDERING_RNDR_ADAPTIVE_UPDATESENTINEL_H_
+#define RENDERING_RNDR_ADAPTIVE_UPDATESENTINEL_H_
+
 #include <scene_rdl2/common/fb_util/FbTypes.h>
 
 #include <algorithm>
@@ -75,4 +78,4 @@ UpdateSentinel::shouldUpdate(const unsigned endSampleIdx) const
 } // namespace rndr
 } // namespace moonray
 
-
+#endif // RENDERING_RNDR_ADAPTIVE_UPDATESENTINEL_H_

@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_HAIR_HAIRSTATE_H_
+#define RENDERING_SHADING_BSDF_HAIR_HAIRSTATE_H_
+
 #include "HairUtil.h"
 
 //#include <moonray/rendering/shading/ispc/bsdf/hair/BsdfHair_ispc_stubs.h>
@@ -180,4 +183,4 @@ private:
 } // namespace shading
 } // namespace moonray
 
-
+#endif // RENDERING_SHADING_BSDF_HAIR_HAIRSTATE_H_

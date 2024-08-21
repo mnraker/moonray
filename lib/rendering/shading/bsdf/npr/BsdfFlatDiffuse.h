@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_NPR_BSDFFLATDIFFUSE_H_
+#define RENDERING_SHADING_BSDF_NPR_BSDFFLATDIFFUSE_H_
+
 #include <moonray/rendering/shading/bsdf/BsdfOrenNayar.h>
 #include <moonray/rendering/shading/bsdf/Bsdf.h>
 #include <moonray/rendering/shading/bsdf/BsdfSlice.h>
@@ -181,3 +184,4 @@ ISPC_UTIL_TYPEDEF_STRUCT(FlatDiffuseBsdfLobe, FlatDiffuseBsdfLobev);
 } // namespace shading
 } // namespace moonray
 
+#endif RENDERING_SHADING_BSDF_NPR_BSDFFLATDIFFUSE_H_

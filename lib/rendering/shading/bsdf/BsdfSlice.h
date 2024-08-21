@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_BSDFSLICE_H_
+#define RENDERING_SHADING_BSDF_BSDFSLICE_H_
+
 #include "Bsdf.h"
 
 #include <moonray/rendering/shading/ispc/bsdf/BsdfSlice_ispc_stubs.h>
@@ -109,3 +112,4 @@ ISPC_UTIL_TYPEDEF_STRUCT(BsdfSlice, BsdfSlicev)
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSDF_BSDFSLICE_H_

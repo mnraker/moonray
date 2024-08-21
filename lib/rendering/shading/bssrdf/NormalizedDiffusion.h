@@ -6,6 +6,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSSRDF_NORMALIZEDDIFFUSION_H_
+#define RENDERING_SHADING_BSSRDF_NORMALIZEDDIFFUSION_H_
+
 #include "Bssrdf.h"
 
 #include <moonray/rendering/shading/ispc/bssrdf/NormalizedDiffusion_ispc_stubs.h>
@@ -75,3 +78,4 @@ private:
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSSRDF_NORMALIZEDDIFFUSION_H_

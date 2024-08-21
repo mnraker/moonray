@@ -9,6 +9,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_BSDFV_H_
+#define RENDERING_SHADING_BSDF_BSDFV_H_
+
 #include "Bsdf.h"
 #include "BsdfSlice.h"
 
@@ -70,3 +73,4 @@ getSurfaceFlags(const BsdfSlicev &slicev, const Bsdfv &bsdfv, const scene_rdl2::
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSDF_BSDFV_H_

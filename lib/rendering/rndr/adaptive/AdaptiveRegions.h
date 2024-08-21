@@ -4,6 +4,9 @@
 
 #pragma once
 
+#ifndef RENDERING_RNDR_ADAPTIVE_ADAPTIVEREGIONS_H_
+#define RENDERING_RNDR_ADAPTIVE_ADAPTIVEREGIONS_H_
+
 #include "ActivePixelMask.h"
 #include "AdaptiveRegionTree.h"
 #include "OverlappingRegions.h"
@@ -171,3 +174,4 @@ inline bool AdaptiveRegions::done() const
 } // namespace rndr
 } // namespace moonray
 
+#endif // RENDERING_RNDR_ADAPTIVE_ADAPTIVEREGIONS_H_

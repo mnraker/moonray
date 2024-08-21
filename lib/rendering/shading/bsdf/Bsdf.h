@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_BSDF_H_
+#define RENDERING_SHADING_BSDF_BSDF_H_
+
 #include "Fresnel.h"
 
 #include <moonray/rendering/shading/ispc/bsdf/Bsdf_ispc_stubs.h>
@@ -532,4 +535,4 @@ typedef ispc::BsdfLobeName BsdfLobeName;
 } // namespace shading
 } // namespace moonray
 
-
+#endif // RENDERING_SHADING_BSDF_BSDF_H_

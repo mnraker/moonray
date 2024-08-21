@@ -6,6 +6,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSSRDF_DIPOLE_H_
+#define RENDERING_SHADING_BSSRDF_DIPOLE_H_
+
 #include "Bssrdf.h"
 #include <moonray/rendering/shading/ispc/bssrdf/Dipole_ispc_stubs.h>
 
@@ -133,3 +136,4 @@ private:
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSSRDF_DIPOLE_H_

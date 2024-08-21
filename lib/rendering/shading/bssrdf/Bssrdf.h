@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSSRDF_BSSRDF_H_
+#define RENDERING_SHADING_BSSRDF_BSSRDF_H_
+
 #include <moonray/rendering/shading/ispc/bssrdf/Bssrdf_ispc_stubs.h>
 #include <moonray/rendering/shading/ispc/BsdfComponent_ispc_stubs.h>
 #include <scene_rdl2/common/math/Color.h>
@@ -188,3 +191,4 @@ Bssrdf *createBSSRDF(scene_rdl2::alloc::Arena* arena,
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSSRDF_BSSRDF_H_

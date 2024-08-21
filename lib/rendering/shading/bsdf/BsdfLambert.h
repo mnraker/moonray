@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_BSDFLAMBERT_H_
+#define RENDERING_SHADING_BSDF_BSDFLAMBERT_H_
+
 #include "Bsdf.h"
 #include "BsdfSlice.h"
 #include <moonray/rendering/shading/PbrValidity.h>
@@ -183,3 +186,4 @@ ISPC_UTIL_TYPEDEF_STRUCT(LambertBsdfLobe, LambertBsdfLobev);
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSDF_BSDFLAMBERT_H_

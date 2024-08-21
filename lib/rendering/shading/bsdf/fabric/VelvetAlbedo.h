@@ -10,6 +10,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_FABRIC_VELVETALBEDO_H_
+#define RENDERING_SHADING_BSDF_FABRIC_VELVETALBEDO_H_
+
 #include <moonray/rendering/shading/ispc/bsdf/fabric/VelvetAlbedo_ispc_stubs.h>
 #include <scene_rdl2/common/math/Math.h>
 
@@ -56,3 +59,4 @@ private:
 } // namespace shading
 } // namespace moonray
 
+#endif // RENDERING_SHADING_BSDF_FABRIC_VELVETALBEDO_H_

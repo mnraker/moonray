@@ -8,6 +8,9 @@
 
 #pragma once
 
+#ifndef RENDERING_SHADING_BSDF_BSDFEYECAUSTIC_H_
+#define RENDERING_SHADING_BSDF_BSDFEYECAUSTIC_H_
+
 #include "Bsdf.h"
 #include "BsdfSlice.h"
 #include <moonray/rendering/shading/Util.h>
@@ -206,4 +209,4 @@ ISPC_UTIL_TYPEDEF_STRUCT(EyeCausticBsdfLobe, EyeCausticBsdfLobev);
 } // namespace shading
 } // namespace moonray
 
-
+#endif // RENDERING_SHADING_BSDF_BSDFEYECAUSTIC_H_

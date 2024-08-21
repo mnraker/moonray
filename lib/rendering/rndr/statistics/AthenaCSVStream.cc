@@ -5,18 +5,22 @@
 #include <moonray/rendering/rndr/Error.h>
 #include <scene_rdl2/render/util/GetEnv.h>
 
-#include <arpa/inet.h>
+#ifndef _MSC_VER
+    #include <arpa/inet.h>
+    #include <netdb.h> //getservbyname
+    #include <netinet/in.h>
+    #include <sys/socket.h>
+    #include <unistd.h> //gethostname
+#else
+    #include <scene_rdl2/common/platform/Endian.h> // brings in winsock2
+#endif
 #include <array>
 #include <cerrno>
 #include <climits> // HOST_NAME_MAX
 #include <cstring> //strerror_r
 #include <ctime> //strftime & localtime_r
 #include <iostream>
-#include <netdb.h> //getservbyname
-#include <netinet/in.h>
 #include <sstream>
-#include <sys/socket.h>
-#include <unistd.h> //gethostname
 
 #ifndef HOST_NAME_MAX
 # ifdef _POSIX_HOST_NAME_MAX
@@ -54,7 +58,11 @@ AthenaCSVStreamBuf::AthenaCSVStreamBuf(const scene_rdl2::util::GUID& guid, bool 
 AthenaCSVStreamBuf::~AthenaCSVStreamBuf()
 {
     if (mOpened) {
+#ifndef _MSC_VER
         ::shutdown(mSocket, SHUT_RDWR);
+#else
+        ::shutdown(mSocket, SD_BOTH);
+#endif
     }
 }
 
@@ -72,18 +80,29 @@ AthenaCSVStreamBuf::open(bool debug)
     }
 
     const auto serviceEntry = ::getservbyname("syslog", "udp");
+#ifndef _MSC_VER // TODO: is there an equivalent in MSVC/winsock2?
     ::endservent();
+#endif
 
     if (serviceEntry == nullptr) {
         std::cerr << "Failed to lookup syslog from services database" << std::endl;
         return;
     }
 
+#ifndef _MSC_VER
     mSocket = ::socket(AF_INET, SOCK_DGRAM|SOCK_NONBLOCK, 0);
+#else
+    mSocket = ::socket(AF_INET, SOCK_DGRAM, 0);
+#endif
     if (mSocket == -1) {
         std::cerr << "Failed to create socket due to: " << rndr::getErrorDescription() << std::endl;
         return;
     }
+
+#ifdef _MSC_VER
+    unsigned long mode = 1; // 1 to enable non-blocking socket
+    ioctlsocket(mSocket, FIONBIO, &mode);
+#endif
 
     struct sockaddr_in addr;
     addr.sin_addr.s_addr = ::inet_addr("127.0.0.1");
@@ -140,9 +159,13 @@ AthenaCSVStreamBuf::appendTimestamp()
     char timestampString[digits + 1] = { 0 };
 
     const auto ms = msSinceEpoch();
+#ifndef _MSC_VER
     static_assert(sizeof(MSType) == sizeof(long),
                     "We're using the long conversion for sprintf");
     std::snprintf(timestampString, digits + 1, "%ld", ms);
+#else
+    std::snprintf(timestampString, digits + 1, "%ld", (long)ms);
+#endif
     appendBuffer(timestampString, std::strlen(timestampString));
 }
 
@@ -155,7 +178,11 @@ AthenaCSVStreamBuf::flushBuffer()
     char timestamp[256];
     time_t now = time(0);
     struct tm tmnow;
+#ifndef _MSC_VER
     localtime_r(&now, &tmnow);
+#else
+    localtime_s(&tmnow, &now);
+#endif
     // Note timestamp must be in this old format, ISO standard format isn't accepted
     //rfc5424: strftime(timestamp, 256, "%FT%T%z", &tmnow);
     strftime(timestamp, 256, "%b %e %H:%M:%S", &tmnow);
@@ -181,7 +208,12 @@ std::string
 AthenaCSVStreamBuf::getLocalHostName()
 {
     char hostname[HOST_NAME_MAX];
+#ifndef _MSC_VER
     gethostname(hostname, HOST_NAME_MAX);
+#else
+    DWORD bufCharCount = HOST_NAME_MAX;
+    GetComputerNameA(reinterpret_cast<LPSTR>(hostname), &bufCharCount);
+#endif
     return std::string(hostname);
 }
 

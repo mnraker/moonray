@@ -6,7 +6,12 @@
 #include "UNIXFileResource.h"
 #include <fstream>
 #include <scene_rdl2/render/util/Strings.h>
+#ifndef _MSC_VER
 #include <unistd.h>
+#else
+#include <io.h>
+#define F_OK 0
+#endif
 
 namespace moonray {
 namespace file_resource {
@@ -38,7 +43,11 @@ std::string UNIXFileResource::extension() const
 bool
 UNIXFileResource::exists() const 
 {
+#ifndef _MSC_VER
     return access(mPath.c_str(), F_OK) == 0;
+#else
+    return _access(mPath.c_str(), F_OK) == 0;
+#endif
 }
 
 std::istream*

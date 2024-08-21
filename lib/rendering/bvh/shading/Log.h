@@ -24,7 +24,7 @@
  *
  * See lib/scene_rdl2/render/logging/logging.h for more details
  */
-extern "C" void CPP_logEvent(const scene_rdl2::rdl2::Shader* shader, scene_rdl2::logging::LogEvent event);
+extern "C" RDL2_DSO_EXPORT void CPP_logEvent(const scene_rdl2::rdl2::Shader* shader, scene_rdl2::logging::LogEvent event);
 
 namespace moonray {
 namespace shading {

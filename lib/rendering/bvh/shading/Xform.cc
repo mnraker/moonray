@@ -7,6 +7,8 @@
 
 #include <moonray/rendering/bvh/shading/State.h>
 
+#include <array>
+
 using namespace scene_rdl2;
 
 namespace moonray {

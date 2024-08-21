@@ -29,7 +29,11 @@ class CACHE_ALIGN ThreadLocalObjectState
     static ThreadLocalObjectState *alignedAlloc(int num)
     {
         void *memptr;
+#ifndef _MSC_VER
         if (auto err = posix_memalign(&memptr, 64, sizeof(ThreadLocalObjectState)*num)) {
+#else
+        if (auto err = _aligned_malloc(sizeof(ThreadLocalObjectState) * num, 64)) {
+#endif
             throw std::bad_alloc();
         }
         ThreadLocalObjectState *result = static_cast<ThreadLocalObjectState *>(memptr);
@@ -47,7 +51,11 @@ class CACHE_ALIGN ThreadLocalObjectState
         for (int i = 0; i < num; i++) {
             tlos[i].~ThreadLocalObjectState();
         }
+#ifndef _MSC_VER
         free(tlos);
+#else
+        _aligned_free(tlos);
+#endif
     }
 
     moonray::util::InclusiveExclusiveAverage<int64> mShaderCallStat;

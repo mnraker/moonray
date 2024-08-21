@@ -50,12 +50,12 @@ inline uniform Vec3f LightTreeNode_getCenter(const uniform LightTreeNode& node)
     return 0.5f * (node.mBBox.lower + node.mBBox.upper);
 }
 /// Get the index of the node's right child
-inline uniform uint LightTreeNode_getRightNodeIndex(const uniform LightTreeNode& node)
+inline uniform uint32_t LightTreeNode_getRightNodeIndex(const uniform LightTreeNode& node)
 { 
     return node.mRightNodeIndex; 
 }
 /// Get the number of lights in this node
-inline uniform uint LightTreeNode_getLightCount(const uniform LightTreeNode& node)
+inline uniform uint32_t LightTreeNode_getLightCount(const uniform LightTreeNode& node)
 { 
     return node.mLightCount; 
 }

@@ -43,7 +43,7 @@ for s in values:
         print()
 ********************************/
 
-constexpr float moebiusTransformationValues[kMoebiusTransformationSize] =
+extern "C" const float moebiusTransformationValues[kMoebiusTransformationSize] =
 {
      0.8737493030104559f,   1.3209205803858595f,   1.2824170425260633f,   1.4311535152670842f,   4.0567600221817344f,   4.0485012295811345f,   4.2763932022500200f,   5.2763932022500200f,
      6.2763932022500200f,   9.2763932022500200f,  10.2763932022500200f,   4.4692043664332459f,   5.8687325363109721f,   9.8687325363109721f,  11.8687325363109721f,  12.8687325363109721f,

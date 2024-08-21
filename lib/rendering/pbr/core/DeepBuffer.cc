@@ -147,7 +147,11 @@ DeepBuffer::addSample(pbr::TLState *pbrTls,
     // transform the rgb + aov params into channel data that the regular addSample()
     //  function can accept
 
+#ifndef _MSC_VER
     int channels[mNumChannels];
+#else
+    std::vector<int> channels(mNumChannels);
+#endif
     for (int i = 0; i < mNumChannels; i++) {
         // we're writing all the channels in this case so the channel list is
         //  just 0..mNumChannels-1
@@ -155,7 +159,11 @@ DeepBuffer::addSample(pbr::TLState *pbrTls,
     }
 
     // copy the beauty and aov data into the channel values array
+#ifndef _MSC_VER
     float values[mNumChannels];
+#else
+    std::vector<float> values(mNumChannels);
+#endif
     values[0] = rgb[0];
     values[1] = rgb[1];
     values[2] = rgb[2];
@@ -164,7 +172,11 @@ DeepBuffer::addSample(pbr::TLState *pbrTls,
     }
 
     addSample(pbrTls, x, y, sx, sy, layer, deepIDs, t, rayZ, normal, alpha,
+#ifndef _MSC_VER
               channels, mNumChannels, values, scale, weight);
+#else
+              &channels[0], mNumChannels, &values[0], scale, weight);
+#endif
 }
 
 void
@@ -830,7 +842,11 @@ DeepBuffer::VolumePixelBuffer::mergeSegments(const DeepBuffer& deepBuffer,
     // This can also be extended to handle an arbitrary number of samples by simply adding
     // more exp() terms inside the log() and dividing by numPixelSamples instead of by 2.
     {
+#ifndef _MSC_VER
         scene_rdl2::math::Color srcSigmaTSums[samplesPerPixel];  // per sample
+#else
+        std::vector<scene_rdl2::math::Color> srcSigmaTSums(samplesPerPixel); // per sample
+#endif
         for (unsigned i = 0; i < samplesPerPixel; i++) {
             srcSigmaTSums[i] = scene_rdl2::math::Color(0.f);
         }
@@ -1285,7 +1301,11 @@ DeepBuffer::writeHardSurfaceSegmentsNoMask(int idx,
         }
 
         // Copy into an array and compute the Z value from the ray direction and t
+#ifndef _MSC_VER
         HardSurfaceSegment *segments[numSegments];
+#else
+        std::vector<HardSurfaceSegment*> segments(numSegments);
+#endif
         hs = const_cast<HardSurfaceSegment*>(mHardSurfaceSegments[layer][idx]);
         numSegments = 0;
         while (hs) {
@@ -1295,7 +1315,11 @@ DeepBuffer::writeHardSurfaceSegmentsNoMask(int idx,
         }
 
         // Sort segments in increasing Z order
+#ifndef _MSC_VER
         std::sort(segments, segments + numSegments, sortSegmentByZ);
+#else
+        std::sort(&segments[0], &segments[0] + numSegments, sortSegmentByZ);
+#endif
 
         // Output the sorted segments.
         // We need to keep track of the total coverage as we output the surfaces in front

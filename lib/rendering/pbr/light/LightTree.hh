@@ -57,7 +57,7 @@
     HUD_PTR(const HUD_UNIFORM Light * const HUD_UNIFORM *, mUnboundedLights);   \
     HUD_MEMBER(uint32_t, mUnboundedLightCount);                                 \
     HUD_PTR(LightTreeNode*, mNodesPtr);                                         \
-    HUD_PTR(uint*, mLightIndicesPtr);                                           \
+    HUD_PTR(uint32_t*, mLightIndicesPtr);                                       \
     HUD_MEMBER(float, mSamplingThreshold)
 
 

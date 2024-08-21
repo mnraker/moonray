@@ -467,13 +467,19 @@ private:
 
     typedef std::array<float, kSIMDSize> SIMDFloatArray;
 
-    __attribute__((aligned(static_cast<int>(kSIMDAlignment)))) SIMDFloatArray mPixelX;
-    __attribute__((aligned(static_cast<int>(kSIMDAlignment)))) SIMDFloatArray mPixelY;
-    __attribute__((aligned(static_cast<int>(kSIMDAlignment)))) SIMDFloatArray mLensU;
-    __attribute__((aligned(static_cast<int>(kSIMDAlignment)))) SIMDFloatArray mLensV;
-    __attribute__((aligned(static_cast<int>(kSIMDAlignment)))) SIMDFloatArray mTime;
+#ifndef _MSC_VER
+#define __attribute_aligned(x) __attribute__((aligned(x)))
+#else
+#define __attribute_aligned(x) __declspec(align(x))
+#endif
 
-#ifndef __clang__
+    __attribute_aligned(static_cast<int>(kSIMDAlignment)) SIMDFloatArray mPixelX;
+    __attribute_aligned(static_cast<int>(kSIMDAlignment)) SIMDFloatArray mPixelY;
+    __attribute_aligned(static_cast<int>(kSIMDAlignment)) SIMDFloatArray mLensU;
+    __attribute_aligned(static_cast<int>(kSIMDAlignment)) SIMDFloatArray mLensV;
+    __attribute_aligned(static_cast<int>(kSIMDAlignment)) SIMDFloatArray mTime;
+
+#if !defined(__clang__) && !defined(_MSC_VER)
     static_assert(__alignof(mPixelX) == kSIMDAlignment, "SIMD alignment.");
     static_assert(__alignof(mPixelY) == kSIMDAlignment, "SIMD alignment.");
     static_assert(__alignof(mLensU)  == kSIMDAlignment, "SIMD alignment.");

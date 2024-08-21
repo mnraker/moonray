@@ -133,7 +133,7 @@ struct SplitCandidate
 
     // Having chosen this SplitCandidate, perform the node creation and light partitioning
     void performSplit(LightTreeNode& leftNode, LightTreeNode& rightNode, const Light* const* lights, 
-                      std::vector<uint>& lightIndices, const LightTreeNode& parent);
+                      std::vector<uint32_t>& lightIndices, const LightTreeNode& parent);
 
     std::pair<int, float> mAxis         = {0, 0.f};   // split axis, 1st: 0, 1, or 2 (x, y, or z), 2nd: value
     float mLeftEnergy                   = 0.f;
@@ -169,13 +169,13 @@ public:
     inline bool isLeaf() const { return mLightCount == 1; }
 
     /// Get the node's starting index in lightIndices
-    inline uint getStartIndex() const { return mStartIndex; }
+    inline uint32_t getStartIndex() const { return mStartIndex; }
 
     /// Get the index of the node's right child
-    inline uint getRightNodeIndex() const { return mRightNodeIndex; }
+    inline uint32_t getRightNodeIndex() const { return mRightNodeIndex; }
 
     /// Get the number of lights in this node
-    inline uint getLightCount() const { return mLightCount; }
+    inline uint32_t getLightCount() const { return mLightCount; }
 
     /// Gets the light index, if it's a leaf. Otherwise, returns -1.
     inline int getLightIndex() const { return mLightIndex; }
@@ -193,27 +193,27 @@ public:
     inline float getEnergyMean() const { return mEnergyMean; }
 
     /// Sets the index of the right child
-    inline void setRightNodeIndex(uint i) { mRightNodeIndex = i; }
+    inline void setRightNodeIndex(uint32_t i) { mRightNodeIndex = i; }
     
     /// Sets the node's light index to the light index found at the start of this node
     /// This function assumes you are running this on a leaf
-    inline void setLeafLightIndex(const std::vector<uint>& lightIndices) { mLightIndex = lightIndices[mStartIndex]; }
+    inline void setLeafLightIndex(const std::vector<uint32_t>& lightIndices) { mLightIndex = lightIndices[mStartIndex]; }
 /// ----------------------------------------------------------------------------------------------------
 
     // Initialize the node. We do a number of calculations in this step to avoid it during sampling time.
-    void init(uint lightCount, 
-              uint startIndex, 
+    void init(uint32_t lightCount, 
+              uint32_t startIndex, 
               const Light* const* lights, 
-              const std::vector<uint>& lightIndices);
+              const std::vector<uint32_t>& lightIndices);
 
     /// Initialize the node, with most of the calculations passed in from the SplitCandidate
-    void init(uint startIndex, 
+    void init(uint32_t startIndex, 
               float energy, 
               const LightTreeCone& cone, 
               const scene_rdl2::math::BBox3f& bbox,
               const Light* const* lights, 
-              const std::vector<uint>& lightIndices, 
-              uint lightCount);
+              const std::vector<uint32_t>& lightIndices, 
+              uint32_t lightCount);
 
     // Calculate the importance weight for the node
     float importance(const scene_rdl2::math::Vec3f& p, 
@@ -221,7 +221,7 @@ public:
                      const LightTreeNode& sibling,
                      bool cullLights) const;
     
-    void printLights(const std::vector<uint>& lightIndices);
+    void printLights(const std::vector<uint32_t>& lightIndices);
     void print();
 
 private:
@@ -240,8 +240,8 @@ private:
 
     /// ---------------------------------------------------------------------------------------------------
 
-    void calcEnergyVariance(uint lightCount, uint startIndex, const Light* const* lights, 
-                            const std::vector<uint>& lightIndices);
+    void calcEnergyVariance(uint32_t lightCount, uint32_t startIndex, const Light* const* lights, 
+                            const std::vector<uint32_t>& lightIndices);
 
     // Calculate the uncertainty angle (angle subtended by the bounding box)
     void calcSinCosThetaU(const float dSqr, const float rSqr, float* sinTheta, float* cosTheta) const;

@@ -3,6 +3,20 @@
 
 #pragma once
 
+#ifdef _MSC_VER
+	#define RENDERING_PBR_IMPORT __declspec(dllimport)
+	#define RENDERING_PBR_EXPORT __declspec(dllexport)
+#else
+	#define RENDERING_PBR_IMPORT __attribute__((visibility("default")))
+	#define RENDERING_PBR_EXPORT __attribute__((visibility("default")))
+#endif
+
+#ifdef rendering_pbr_EXPORTS
+	#define RENDERING_PBR_API RENDERING_PBR_EXPORT
+#else
+	#define RENDERING_PBR_API RENDERING_PBR_IMPORT
+#endif
+
 #include "RSequence.h"
 #include "Sample.h"
 #include "SamplePartition.h"
@@ -29,12 +43,12 @@ namespace pbr {
 const std::size_t kSampleGridSize = 64;
 #if defined(USE_PARTITIONED_PIXEL_2D)
 typedef SpatialSamplePartition<Sample2D, kSampleGridSize> PixelPartition;
-extern PixelPartition kPixelPartition;
+RENDERING_PBR_API extern PixelPartition kPixelPartition;
 #endif
 
 #if defined(USE_PARTITIONED_PIXEL_5D)
 typedef SpatialSamplePartition<Sample, kSampleGridSize> PixelPartition;
-extern PixelPartition kPixelPartition;
+RENDERING_PBR_API extern PixelPartition kPixelPartition;
 #endif
 
 #if defined(USE_PARTITIONED_LENS)
@@ -58,7 +72,7 @@ extern PixelPartition kPixelPartition;
 // // | 8 0 | 9 1 | A 2 | B 0 | 8 1 | 9 2 | A 0 | B 1 | 8 2 | 9 0 | A 1 | B 2 |
 // // | C 3 | D 4 | E 5 | F 3 | C 4 | D 5 | E 3 | F 4 | C 5 | D 3 | E 4 | F 5 |
 typedef SamplePartition<Sample2D, 31*31, 1024> LensPartition;
-extern LensPartition kLensPartition;
+RENDERING_PBR_API extern LensPartition kLensPartition;
 #endif
 
 #if defined(USE_PARTITIONED_TIME)
@@ -66,15 +80,15 @@ extern LensPartition kLensPartition;
 // size of the pixel sample partition. This means that as we tile the pixel
 // partition, we're going to mix the pixel samples with the time samples.
 typedef SamplePartition<float, 29*29, 1024> TimePartition;
-extern TimePartition kTimePartition;
+RENDERING_PBR_API extern TimePartition kTimePartition;
 #endif
 
 #if defined(USE_PARTITIONED_1D)
-extern const std::vector<float>    k1DSampleTable;
+RENDERING_PBR_API extern const std::vector<float>    k1DSampleTable;
 #endif
 
 #if defined(USE_PARTITIONED_2D)
-extern const std::vector<Sample2D> k2DSampleTable;
+RENDERING_PBR_API extern const std::vector<Sample2D> k2DSampleTable;
 #endif
 
 namespace detail {

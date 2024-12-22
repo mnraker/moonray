@@ -122,6 +122,7 @@ public:
     void bakeGeometry(scene_rdl2::rdl2::Layer* layer,
             const geom::MotionBlurParams& motionBlurParams,
             const std::vector<mcrt_common::Frustum>& frustums,
+            const std::vector<mcrt_common::Fishtum>& fishtums,
             const scene_rdl2::math::Mat4d& world2render,
             std::vector<std::unique_ptr<geom::BakedMesh>>& bakedMeshes,
             std::vector<std::unique_ptr<geom::BakedCurves>>& bakedCurves,
@@ -132,6 +133,7 @@ public:
     GM_RESULT finalizeChanges(scene_rdl2::rdl2::Layer* layer,
                               const geom::MotionBlurParams& motionBlurParams,
                               const std::vector<mcrt_common::Frustum>& frustums,
+                              const std::vector<mcrt_common::Fishtum>& fishtums,
                               const scene_rdl2::math::Mat4d& world2render,
                               OptimizationTarget accelMode,
                               const scene_rdl2::rdl2::Camera* dicingCamera,
@@ -220,6 +222,7 @@ private:
     GM_RESULT tessellate(scene_rdl2::rdl2::Layer* layer,
                          geom::InternalPrimitiveList& primitivesToTessellate,
                          const std::vector<mcrt_common::Frustum>& frustums,
+                         const std::vector<mcrt_common::Fishtum>& fishtums,
                          const scene_rdl2::math::Mat4d& world2render,
                          const geom::MotionBlurParams& motionBlurParams,
                          const scene_rdl2::rdl2::Camera* globalDicingCamera);

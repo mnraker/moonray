@@ -17,7 +17,7 @@ def version():
     """
     Increment the build in the version.
     """
-    _version = '16.10'
+    _version = '16.36'
     from rezbuild import earlybind
     return earlybind.version(this, _version)
 
@@ -32,17 +32,22 @@ help = ('For assistance, '
         "please contact the folio's owner at: moonbase-dev@dreamworks.com")
 
 variants = [
-    ['os-CentOS-7', 'opt_level-optdebug', 'refplat-vfx2021.0', 'gcc-9.3.x.1', 'amorphous-8', 'openvdb-8', 'zlib-1.2.8.x.2'],
+    ['os-rocky-9', 'opt_level-optdebug', 'refplat-vfx2023.1', 'gcc-11.x', 'amorphous-9', 'openvdb-10', 'imath-3', 'zlib-1.2.11.x'],
     ['os-CentOS-7', 'opt_level-debug', 'refplat-vfx2021.0', 'gcc-9.3.x.1', 'amorphous-8', 'openvdb-8', 'zlib-1.2.8.x.2'],
-    ['os-CentOS-7', 'opt_level-optdebug', 'refplat-vfx2021.0', 'clang-13', 'amorphous-8', 'openvdb-8', 'zlib-1.2.8.x.2'],
-    ['os-CentOS-7', 'opt_level-optdebug', 'refplat-vfx2022.0', 'gcc-9.3.x.1', 'amorphous-9', 'openvdb-9', 'imath-3', 'zlib-1.2.8.x.2'],
-    ['os-CentOS-7', 'opt_level-debug', 'refplat-vfx2022.0', 'gcc-9.3.x.1', 'amorphous-9', 'openvdb-9', 'imath-3', 'zlib-1.2.8.x.2'],
+    ['os-rocky-9', 'opt_level-debug', 'refplat-vfx2023.1', 'gcc-11.x', 'amorphous-9', 'openvdb-10', 'imath-3', 'zlib-1.2.11.x'],
+    ['os-rocky-9', 'opt_level-optdebug', 'refplat-vfx2023.1', 'clang-17.0.6.x', 'amorphous-9', 'openvdb-10', 'imath-3', 'zlib-1.2.11.x'],
+#    ['os-rocky-9', 'opt_level-debug', 'refplat-vfx2023.1', 'clang-17.0.6.x', 'amorphous-9', 'openvdb-10', 'imath-3', 'zlib-1.2.11.x'],
+    
     ['os-rocky-9', 'opt_level-optdebug', 'refplat-vfx2021.0', 'gcc-9.3.x.1', 'amorphous-8', 'openvdb-8', 'zlib-1.2.11.x'],
     ['os-rocky-9', 'opt_level-debug', 'refplat-vfx2021.0', 'gcc-9.3.x.1', 'amorphous-8', 'openvdb-8', 'zlib-1.2.11.x'],
     ['os-rocky-9', 'opt_level-optdebug', 'refplat-vfx2022.0', 'gcc-9.3.x.1', 'amorphous-9', 'openvdb-9', 'imath-3', 'zlib-1.2.11.x'],
     ['os-rocky-9', 'opt_level-debug', 'refplat-vfx2022.0', 'gcc-9.3.x.1', 'amorphous-9', 'openvdb-9', 'imath-3', 'zlib-1.2.11.x'],
-    ['os-rocky-9', 'opt_level-optdebug', 'refplat-vfx2023.0', 'gcc-11.x', 'amorphous-9', 'openvdb-10', 'imath-3', 'zlib-1.2.11.x'],
-    ['os-rocky-9', 'opt_level-debug', 'refplat-vfx2023.0', 'amorphous-9', 'openvdb-10', 'imath-3', 'zlib-1.2.11.x'],
+    
+    ['os-CentOS-7', 'opt_level-optdebug', 'refplat-vfx2021.0', 'gcc-9.3.x.1', 'amorphous-8', 'openvdb-8', 'zlib-1.2.8.x.2'],
+    # ['os-CentOS-7', 'opt_level-debug', 'refplat-vfx2021.0', 'gcc-9.3.x.1', 'amorphous-8', 'openvdb-8', 'zlib-1.2.8.x.2'],
+    ['os-CentOS-7', 'opt_level-optdebug', 'refplat-vfx2021.0', 'clang-13', 'amorphous-8', 'openvdb-8', 'zlib-1.2.8.x.2'],
+    ['os-CentOS-7', 'opt_level-optdebug', 'refplat-vfx2022.0', 'gcc-9.3.x.1', 'amorphous-9', 'openvdb-9', 'imath-3', 'zlib-1.2.8.x.2'],
+    ['os-CentOS-7', 'opt_level-debug', 'refplat-vfx2022.0', 'gcc-9.3.x.1', 'amorphous-9', 'openvdb-9', 'imath-3', 'zlib-1.2.8.x.2'],
 ]
 
 conf_rats_variants = variants[0:2]
@@ -53,7 +58,7 @@ requires = [
     'boost',
     'cuda-12.1.0.x',
     'embree-4.2.0.x',
-    'mcrt_denoise-5.8',
+    'mcrt_denoise-5.22',
     'mkl',
     'openexr',
     'openimageio-2.3.20.0.x',
@@ -61,7 +66,7 @@ requires = [
     'openvdb',
     'optix-7.6.0.x',
     'random123-1.08.3',
-    'scene_rdl2-14.8',
+    'scene_rdl2-14.22',
 ]
 
 private_build_requires = [

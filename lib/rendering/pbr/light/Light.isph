@@ -20,6 +20,7 @@
 #include <embree4/rtcore.isph>
 #include <embree4/rtcore_ray.isph>
 
+struct PathVertex;
 struct ShadingTLState;
 
 // Infinity, but not quite so we can distinguish from no light hit
@@ -86,6 +87,14 @@ struct EnvLight
     ENV_LIGHT_MEMBERS;
 };
 
+struct PortalLight
+{
+    LIGHT_MEMBERS;
+    LOCAL_PARAM_LIGHT_MEMBERS;
+    RECT_LIGHT_MEMBERS;
+    PORTAL_LIGHT_MEMBERS;
+};
+
 struct RectLight
 {
     LIGHT_MEMBERS;
@@ -117,7 +126,8 @@ struct SpotLight
 typedef varying bool (* uniform LightCanIlluminateFn)(
         const uniform Light * uniform light,
         const varying Vec3f &p, const varying Vec3f &cullingNormal, varying float time,
-        varying float radius, const uniform LightFilterList * uniform lightFilterList);
+        varying float radius, const uniform LightFilterList * uniform lightFilterList,
+        const varying PathVertex * uniform pv);
 
 typedef varying bool (* uniform LightIntersectFn)(
         const uniform Light * uniform light,
@@ -132,16 +142,18 @@ typedef varying bool (* uniform LightSampleFn)(
 
 typedef varying Color (* uniform LightEvalFn)(
         const uniform Light * uniform light, uniform ShadingTLState * uniform tls,
-        const varying Vec3f &wi, const varying Vec3f &p, const varying LightFilterRandomValues &filterR, 
+        const varying Vec3f &wi, const varying Vec3f &p, const varying LightFilterRandomValues &filterR,
         varying float time, const varying LightIntersection &isect,
         uniform bool fromCamera, const uniform LightFilterList * uniform lightFilterList,
-        varying float rayDirFootprint, varying float * uniform pdf);
+        const varying PathVertex * uniform pv,
+        varying float rayDirFootprint, varying float * uniform visibility, varying float * uniform pdf);
 
 typedef uniform float (* uniform LightGetThetaOFn)(const uniform Light * uniform);
 typedef uniform float (* uniform LightGetThetaEFn)(const uniform Light * uniform);
 
 inline void
 Light_init(uniform Light * uniform light,
+        uniform LightType type,
         LightCanIlluminateFn canIlluminateFn,
         LightIntersectFn intersectFn,
         LightSampleFn sampleFn,
@@ -149,6 +161,7 @@ Light_init(uniform Light * uniform light,
         LightGetThetaOFn getThetaOFn,
         LightGetThetaEFn getThetaEFn)
 {
+    light->mType = (uniform int8_t)type;
     light->mCanIlluminateFn = (intptr_t)canIlluminateFn;
     light->mIntersectFn = (intptr_t)intersectFn;
     light->mSampleFn = (intptr_t)sampleFn;
@@ -158,24 +171,11 @@ Light_init(uniform Light * uniform light,
 }
 
 
-/// Is this light visible in camera, and if so is it opaque in the
-/// alpha channel ?
+/// Is this light visible in camera?
 inline uniform bool
 Light_getIsVisibleInCamera(const uniform Light * uniform light)
 {
     return light->mIsVisibleInCamera;
-}
-
-inline uniform bool
-Light_getIsOpaqueInAlpha(const uniform Light * uniform light)
-{
-    return light->mIsOpaqueInAlpha;
-}
-
-inline varying bool
-Light_getIsOpaqueInAlpha(const uniform Light * varying light)
-{
-    return light->mIsOpaqueInAlpha;
 }
 
 inline varying int32_t
@@ -200,6 +200,12 @@ inline varying bool
 Light_getIsRayTerminator(const uniform Light * varying light)
 {
     return light->mIsRayTerminator;
+}
+
+inline uniform bool
+Light_hasPortal(const uniform Light * uniform light)
+{
+    return light->mHasPortal;
 }
 
 /// See Light.hh for details
@@ -424,11 +430,12 @@ LocalParamLight_xformRender2LocalScale(const uniform LocalParamLight * uniform l
 inline varying bool
 Light_canIlluminate(const uniform Light * uniform light,
        const varying Vec3f &p, const varying Vec3f &cullingNormal, varying float time,
-       varying float radius, const uniform LightFilterList * uniform lightFilterList)
+       varying float radius, const uniform LightFilterList * uniform lightFilterList,
+       const varying PathVertex * uniform pv)
 {
     MNRY_ASSERT(light->mCanIlluminateFn != 0);
     LightCanIlluminateFn canIlluminateFn = (LightCanIlluminateFn)light->mCanIlluminateFn;
-    return canIlluminateFn(light, p, cullingNormal, time, radius, lightFilterList);
+    return canIlluminateFn(light, p, cullingNormal, time, radius, lightFilterList, pv);
 }
 
 /// Compute whether the ray (p, wi) intersects the light, within the given
@@ -494,22 +501,25 @@ Light_sample(const uniform Light * uniform light,
 /// @@@ TODO: Expand interface to take texture differentials.
 inline varying Color
 Light_eval(const uniform Light * uniform light, uniform ShadingTLState * uniform tls,
-        const varying Vec3f &wi, const varying Vec3f &p, const varying LightFilterRandomValues &filterR, 
+        const varying Vec3f &wi, const varying Vec3f &p, const varying LightFilterRandomValues &filterR,
         varying float time, const varying LightIntersection &isect,
-        uniform bool fromCamera, const uniform LightFilterList * uniform lightFilterList, varying float rayDirFootprint,
-        varying float * uniform pdf = nullptr)
+        uniform bool fromCamera, const uniform LightFilterList * uniform lightFilterList,
+        const varying PathVertex * uniform pv, varying float rayDirFootprint,
+        varying float * uniform visibility, varying float * uniform pdf = nullptr)
 {
     MNRY_ASSERT(light->mEvalFn != 0);
     LightEvalFn evalFn = (LightEvalFn)light->mEvalFn;
-    return evalFn(light, tls, wi, p, filterR, time, isect, fromCamera, lightFilterList, rayDirFootprint, pdf);
+    return evalFn(light, tls, wi, p, filterR, time, isect, fromCamera, lightFilterList, pv, 
+                  rayDirFootprint, visibility, pdf);
 }
 
 inline varying Color
 Light_eval(const uniform Light * varying light, uniform ShadingTLState * uniform tls,
-        const varying Vec3f &wi, const varying Vec3f &p, const varying LightFilterRandomValues &filterR, 
+        const varying Vec3f &wi, const varying Vec3f &p, const varying LightFilterRandomValues &filterR,
         varying float time, const varying LightIntersection &isect,
-        uniform bool fromCamera, const uniform LightFilterList * varying lightFilterList, varying float rayDirFootprint,
-        varying float * uniform pdf = nullptr)
+        uniform bool fromCamera, const uniform LightFilterList * varying lightFilterList,
+        const varying PathVertex * uniform pv, varying float rayDirFootprint,
+        varying float * uniform visibility, varying float * uniform pdf = nullptr)
 {
     Color result;
     foreach_unique(l in light) {
@@ -526,7 +536,7 @@ Light_eval(const uniform Light * varying light, uniform ShadingTLState * uniform
         uniform int lane = count_trailing_zeros(lanemask());
         const uniform LightFilterList * uniform lfl =
             (const uniform LightFilterList * uniform) extract((intptr_t) lightFilterList, lane);
-        result = evalFn(l, tls, wi, p, filterR, time, isect, fromCamera, lfl, rayDirFootprint, pdf);
+        result = evalFn(l, tls, wi, p, filterR, time, isect, fromCamera, lfl, pv, rayDirFootprint, visibility, pdf);
     }
 
     return result;

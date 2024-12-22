@@ -5,12 +5,15 @@
 #include "OptixGPUMath.h"
 #include "OptixGPUParams.h"
 #include "OptixGPUSBTRecord.h"
+#include "EmbreeRoundlineIntersector.h"
+#include "EmbreeCurveIntersectorSweep.h"
 
 using namespace moonray::rt;
 
 extern "C" __constant__ static OptixGPUParams params;
 
-#define EMBREE_INVALID_GEOMETRY_ID (static_cast<unsigned int>(-1))
+#define EMBREE_INVALID_GEOMETRY_ID 0xffffffff
+#define INVALID_LIGHT_ID 0xffffffff
 
 // Each ray has a PerRayData associated with it that is globally
 // available in all of the programs.  Inputs and outputs are passed via this
@@ -19,6 +22,7 @@ extern "C" __constant__ static OptixGPUParams params;
 struct PerRayData
 {
     bool mIsOcclusionRay;
+    int mMask;
     int mShadowReceiverId;        // used for shadow linking (input)
     unsigned long long mLightId;  // used for shadow linking (input)
     bool mDidHitGeom;             // did ray hit geometry? (output)
@@ -30,6 +34,12 @@ struct PerRayData
     unsigned int mPrimID;
     unsigned int mEmbreeGeomID;
     intptr_t mEmbreeUserData;
+
+    unsigned int mInstance0IdOrLight;
+    unsigned int mInstance1Id;
+    unsigned int mInstance2Id;
+    unsigned int mInstance3Id;
+    float mL2R[4][3]; // layout matches Mat43
 };
 
 
@@ -87,7 +97,6 @@ T *getPRD()
     return reinterpret_cast<T*>(reconstructPointer(u0, u1));
 }
 
-
 // The __raygen__ program sets up the PerRayData and then calls optixTrace()
 // which starts the BVH traversal and calling of other programs.  It copies 
 // the prd.mDidHitGeom result to the appropriate location in the output buffer.
@@ -104,9 +113,12 @@ void __raygen__()
         // intersection ray
         PerRayData prd;
         prd.mIsOcclusionRay = false;
+        prd.mMask = ray->mMask;
         prd.mShadowReceiverId = -1;
-        prd.mLightId = -1;
+        prd.mLightId = INVALID_LIGHT_ID;
         prd.mDidHitGeom = false;
+        // other prd members don't need to be cleared
+
         unsigned int u0, u1;
         splitPointer(&prd, u0, u1);
 
@@ -116,35 +128,49 @@ void __raygen__()
                 ray->mMinT,
                 ray->mMaxT,
                 ray->mTime,
-                OptixVisibilityMask( 255 ),
+                OptixVisibilityMask(ray->mMask & 0xff),
                 OPTIX_RAY_FLAG_NONE,
                 0,             // SBT offset
                 1,             // SBT stride
                 0,             // missSBTIndex
                 u0, u1);
 
+        GPURayIsect *isect = params.mIsectBuf + idx.x;
         if (prd.mDidHitGeom) {
-            params.mIsectBuf[idx.x].mTFar = prd.mTFar;
-            params.mIsectBuf[idx.x].mNgX = prd.mNgX;
-            params.mIsectBuf[idx.x].mNgY = prd.mNgY;
-            params.mIsectBuf[idx.x].mNgZ = prd.mNgZ;
-            params.mIsectBuf[idx.x].mU = prd.mU;
-            params.mIsectBuf[idx.x].mV = prd.mV;
-            params.mIsectBuf[idx.x].mEmbreeGeomID = prd.mEmbreeGeomID;
-            params.mIsectBuf[idx.x].mPrimID = prd.mPrimID;
-            params.mIsectBuf[idx.x].mEmbreeUserData = prd.mEmbreeUserData;
+            isect->mTFar = prd.mTFar;
+            isect->mNgX = prd.mNgX;
+            isect->mNgY = prd.mNgY;
+            isect->mNgZ = prd.mNgZ;
+            isect->mU = prd.mU;
+            isect->mV = prd.mV;
+            isect->mEmbreeGeomID = prd.mEmbreeGeomID;
+            isect->mPrimID = prd.mPrimID;
+            isect->mEmbreeUserData = prd.mEmbreeUserData;
+            isect->mInstance0IdOrLight = prd.mInstance0IdOrLight;
+            isect->mInstance1Id = prd.mInstance1Id;
+            isect->mInstance2Id = prd.mInstance2Id;
+            isect->mInstance3Id = prd.mInstance3Id;
+            memcpy(isect->mL2R, prd.mL2R, 12 * sizeof(float));
         } else {
-            params.mIsectBuf[idx.x].mEmbreeGeomID = EMBREE_INVALID_GEOMETRY_ID;
-            params.mIsectBuf[idx.x].mPrimID = 0;
-            params.mIsectBuf[idx.x].mEmbreeUserData = 0;
+            isect->mTFar = ray->mMaxT; // must be set even if no intersection or volumes will fail
+            isect->mEmbreeGeomID = EMBREE_INVALID_GEOMETRY_ID;
+            isect->mPrimID = 0;
+            isect->mEmbreeUserData = 0;
+            isect->mInstance0IdOrLight = 0;
+            isect->mInstance1Id = 0;
+            isect->mInstance2Id = 0;
+            isect->mInstance3Id = 0;
         }
     } else {
         // occlusion ray
         PerRayData prd;
         prd.mIsOcclusionRay = true;
+        prd.mMask = ray->mMask;
         prd.mShadowReceiverId = ray->mShadowReceiverId;
         prd.mLightId = ray->mLightId;
         prd.mDidHitGeom = false;
+        // other prd members don't need to be cleared
+
         unsigned int u0, u1;
         splitPointer(&prd, u0, u1);
 
@@ -154,7 +180,7 @@ void __raygen__()
                 ray->mMinT,
                 ray->mMaxT,
                 ray->mTime,
-                OptixVisibilityMask( 255 ),
+                OptixVisibilityMask(ray->mMask & 0xff),
                 OPTIX_RAY_FLAG_NONE, // OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT for occlusion rays?
                 0,             // SBT offset
                 1,             // SBT stride
@@ -165,6 +191,36 @@ void __raygen__()
     }
 }
 
+inline __device__
+void getTriVerts(const moonray::rt::HitGroupData* data, float3 verts[3])
+{
+    int motionSamplesCount = data->mesh.mMotionSamplesCount;
+    int primIdx = optixGetPrimitiveIndex();
+    int idx0 = data->mesh.mIndices[primIdx * 3];
+    int idx1 = data->mesh.mIndices[primIdx * 3 + 1];
+    int idx2 = data->mesh.mIndices[primIdx * 3 + 2];
+
+    if (motionSamplesCount == 1) {
+        verts[0] = data->mesh.mVertices[0][idx0];
+        verts[1] = data->mesh.mVertices[0][idx1];
+        verts[2] = data->mesh.mVertices[0][idx2];
+    } else {
+        const float time = optixGetRayTime();
+        const float sample0PlusT = time * (motionSamplesCount - 1);
+        const unsigned int sample0 = static_cast<unsigned int>(sample0PlusT);
+        const unsigned int sample1 = fminf(sample0 + 1, motionSamplesCount - 1); // clamp to time = 1
+        const float t = sample0PlusT - static_cast<float>(sample0);
+        float3 vtx0_0 = data->mesh.mVertices[sample0][idx0];
+        float3 vtx1_0 = data->mesh.mVertices[sample0][idx1];
+        float3 vtx2_0 = data->mesh.mVertices[sample0][idx2];
+        float3 vtx0_1 = data->mesh.mVertices[sample1][idx0];
+        float3 vtx1_1 = data->mesh.mVertices[sample1][idx1];
+        float3 vtx2_1 = data->mesh.mVertices[sample1][idx2];
+        verts[0] = lerp(vtx0_0, vtx0_1, t);
+        verts[1] = lerp(vtx1_0, vtx1_1, t);
+        verts[2] = lerp(vtx2_0, vtx2_1, t);
+    }
+}
 
 // The __closesthit__ program is called after optixReportIntersection() has been
 // called in one or more of the __intersection__ programs and Optix has finished 
@@ -183,21 +239,66 @@ void __closesthit__()
         prd->mEmbreeGeomID = data->mEmbreeGeomID;
         prd->mEmbreeUserData = data->mEmbreeUserData;
 
+        float objectToWorld[12];
+        optixGetObjectToWorldTransformMatrix(objectToWorld);
+        prd->mL2R[0][0] = objectToWorld[0];
+        prd->mL2R[0][1] = objectToWorld[4];
+        prd->mL2R[0][2] = objectToWorld[8];
+        prd->mL2R[1][0] = objectToWorld[1];
+        prd->mL2R[1][1] = objectToWorld[5];
+        prd->mL2R[1][2] = objectToWorld[9];
+        prd->mL2R[2][0] = objectToWorld[2];
+        prd->mL2R[2][1] = objectToWorld[6];
+        prd->mL2R[2][2] = objectToWorld[10];
+        prd->mL2R[3][0] = objectToWorld[3];
+        prd->mL2R[3][1] = objectToWorld[7];
+        prd->mL2R[3][2] = objectToWorld[11];
+
+        // Did we traverse any instances along the way to this hit?
+        prd->mInstance0IdOrLight = 0;
+        prd->mInstance1Id = 0;
+        prd->mInstance2Id = 0;
+        prd->mInstance3Id = 0;
+
+        unsigned int instanceDepth = 0;
+        for (unsigned int i = 0; i < optixGetTransformListSize(); ++i) {
+            OptixTraversableHandle handle = optixGetTransformListHandle(i);
+            switch (optixGetTransformTypeFromHandle(handle)) {
+                case OPTIX_TRANSFORM_TYPE_INSTANCE:
+                {
+                    unsigned int instanceId = optixGetInstanceIdFromHandle(handle);
+                    if (instanceId == 0) {
+                        // not a regular MoonRay instance
+                        continue;
+                    }
+                    // else this is a MoonRay instance, record the Id
+                    // refer to lib/rendering/geom/prim/Instance.cc::intersectFunc()
+                    switch (instanceDepth) {
+                        case 0: prd->mInstance0IdOrLight = instanceId;
+                        break;
+                        case 1: prd->mInstance1Id = instanceId;
+                        break;
+                        case 2: prd->mInstance2Id = instanceId;
+                        break;
+                        case 3: prd->mInstance3Id = instanceId;
+                        break;
+                        // We ignore instances more than 4 deep.
+                    }
+                    instanceDepth++;
+                }
+                break;
+            }
+        }
+
         switch (data->mType) {
             case HitGroupData::TRIANGLE_MESH:
             case HitGroupData::QUAD_MESH:
             {
-                float3 verts[3]; 
-                optixGetTriangleVertexData(optixGetGASTraversableHandle(),
-                                           optixGetPrimitiveIndex(),
-                                           optixGetSbtGASIndex(),
-                                           optixGetRayTime(),
-                                           verts);
-                // Compute the geometric normal.  We do not need to normalize this (Embree does
-                //  not normalize and we want to exactly match its behavior.)
+                float3 verts[3];
+                getTriVerts(data, verts);
                 float3 ng = cross(verts[1] - verts[0], verts[2] - verts[0]);
                 prd->mNgX = ng.x;
-                prd->mNgY = ng.y; 
+                prd->mNgY = ng.y;
                 prd->mNgZ = ng.z;
 
                 float2 uv = optixGetTriangleBarycentrics();
@@ -270,21 +371,12 @@ void __closesthit__()
             }
             break;
             case HitGroupData::ROUND_LINEAR_CURVES:
+            case HitGroupData::ROUND_BSPLINE_CURVES:
             {
-                prd->mNgX = 0.f; // TODO
-                prd->mNgY = 0.f; 
-                prd->mNgZ = 1.f;
-                prd->mU = optixGetCurveParameter();
-                prd->mV = 0.f;
-                prd->mPrimID = optixGetPrimitiveIndex();
-            }
-            break;
-            case HitGroupData::ROUND_CUBIC_BSPLINE_CURVES:
-            {
-                prd->mNgX = 0.f; // TODO
-                prd->mNgY = 0.f; 
-                prd->mNgZ = 1.f;
-                prd->mU = optixGetCurveParameter();
+                prd->mNgX = asFloat(optixGetAttribute_0());
+                prd->mNgY = asFloat(optixGetAttribute_1());
+                prd->mNgZ = asFloat(optixGetAttribute_2());
+                prd->mU = asFloat(optixGetAttribute_3());
                 prd->mV = 0.f;
                 prd->mPrimID = optixGetPrimitiveIndex();
             }
@@ -310,6 +402,10 @@ void __closesthit__()
         prd->mPrimID = 0;
         prd->mEmbreeGeomID = EMBREE_INVALID_GEOMETRY_ID;
         prd->mEmbreeUserData = 0;
+        prd->mInstance0IdOrLight = 0;
+        prd->mInstance1Id = 0;
+        prd->mInstance2Id = 0;
+        prd->mInstance3Id = 0;
     }
 }
 
@@ -323,16 +419,17 @@ void __anyhit__()
     PerRayData* prd = getPRD<PerRayData>();
     const moonray::rt::HitGroupData* data = (moonray::rt::HitGroupData*)optixGetSbtDataPointer();
 
-    if (prd->mIsOcclusionRay) {
-        if (data->mIsSingleSided && optixIsTriangleBackFaceHit()) {
-            optixIgnoreIntersection();
-            return;
-        }
-        if (!data->mVisibleShadow) {
-            optixIgnoreIntersection();
-            return;
-        }
+    if ((data->mMask & prd->mMask) == 0) {
+        optixIgnoreIntersection();
+        return;
+    }
 
+    if (data->mIsSingleSided && optixIsTriangleBackFaceHit()) {
+        optixIgnoreIntersection();
+        return;
+    }
+
+    if (prd->mIsOcclusionRay) {
         unsigned int primIdx = optixGetPrimitiveIndex();
         unsigned int casterId = data->mAssignmentIds[primIdx];
 
@@ -593,21 +690,13 @@ bool intersectCurveQuad(const float3 vtx[4],
     return true;
 }
 
-extern "C" __global__
-void __intersection__flat_bezier_curve()
+__device__
+void getCurveControlPoints(float4 cp[4])
 {
     const HitGroupData* data = (HitGroupData*)optixGetSbtDataPointer();
     const unsigned int primIdx = optixGetPrimitiveIndex();
-    const unsigned int segmentsPerCurve = data->curve.mSegmentsPerCurve;
-
-    const float3 rayOrg = optixGetObjectRayOrigin();
-    const float3 rayDir = optixGetObjectRayDirection();
-    const float rayTmin = optixGetRayTmin();
-    const float rayTmax = optixGetRayTmax();
-    const float dirLength = length(rayDir);
 
     const int motionSamplesCount = data->curve.mMotionSamplesCount;
-    float4 cp[4];
     if (motionSamplesCount == 1) {
         const float4* cp0 = data->curve.mControlPoints + data->curve.mIndices[primIdx];
         cp[0] = cp0[0];
@@ -629,6 +718,23 @@ void __intersection__flat_bezier_curve()
         cp[2] = lerp(cp0[2], cp1[2], t);
         cp[3] = lerp(cp0[3], cp1[3], t);
     }
+}
+
+extern "C" __global__
+void __intersection__flat_bezier_curve()
+{
+    // Based on PBRT
+
+    float4 cp[4];
+    getCurveControlPoints(cp);
+
+    const HitGroupData* data = (HitGroupData*)optixGetSbtDataPointer();
+    const float3 rayOrg = optixGetObjectRayOrigin();
+    const float3 rayDir = optixGetObjectRayDirection();
+    const float rayTmin = optixGetRayTmin();
+    const float rayTmax = optixGetRayTmax();
+    const float dirLength = length(rayDir);
+    const unsigned int segmentsPerCurve = data->curve.mSegmentsPerCurve;
 
     float4 cp2d[4];
     projectCurveControlPoints(cp, 4, rayOrg, rayDir, cp2d);
@@ -701,39 +807,18 @@ void __intersection__flat_bezier_curve()
 extern "C" __global__
 void __intersection__flat_bspline_curve()
 {
-    const HitGroupData* data = (HitGroupData*)optixGetSbtDataPointer();
-    const unsigned int primIdx = optixGetPrimitiveIndex();
-    const unsigned int segmentsPerCurve = data->curve.mSegmentsPerCurve;
+    // Based on PBRT
 
+    float4 cp[4];
+    getCurveControlPoints(cp);
+
+    const HitGroupData* data = (HitGroupData*)optixGetSbtDataPointer();
     const float3 rayOrg = optixGetObjectRayOrigin();
     const float3 rayDir = optixGetObjectRayDirection();
     const float rayTmin = optixGetRayTmin();
     const float rayTmax = optixGetRayTmax();
     const float dirLength = length(rayDir);
-
-    const int motionSamplesCount = data->curve.mMotionSamplesCount;
-    float4 cp[4];
-    if (motionSamplesCount == 1) {
-        const float4* cp0 = data->curve.mControlPoints + data->curve.mIndices[primIdx];
-        cp[0] = cp0[0];
-        cp[1] = cp0[1];
-        cp[2] = cp0[2];
-        cp[3] = cp0[3];
-    } else {
-        const float time = optixGetRayTime();
-        const float sample0PlusT = time * (motionSamplesCount - 1);
-        const unsigned int sample0 = static_cast<unsigned int>(sample0PlusT);
-        const unsigned int sample1 = fminf(sample0 + 1, motionSamplesCount - 1); // clamp to time = 1
-        const float t = sample0PlusT - static_cast<float>(sample0);
-        const float4* cp0 = data->curve.mControlPoints + data->curve.mNumControlPoints * sample0 +
-                                                         data->curve.mIndices[primIdx];
-        const float4* cp1 = data->curve.mControlPoints + data->curve.mNumControlPoints * sample1 +
-                                                         data->curve.mIndices[primIdx];
-        cp[0] = lerp(cp0[0], cp1[0], t);
-        cp[1] = lerp(cp0[1], cp1[1], t);
-        cp[2] = lerp(cp0[2], cp1[2], t);
-        cp[3] = lerp(cp0[3], cp1[3], t);
-    }
+    const unsigned int segmentsPerCurve = data->curve.mSegmentsPerCurve;
 
     float4 cp2d[4];
     projectCurveControlPoints(cp, 4, rayOrg, rayDir, cp2d);
@@ -803,8 +888,46 @@ void __intersection__flat_bspline_curve()
 }
 
 extern "C" __global__
+void __intersection__round_bspline_curve()
+{
+    float4 cp[4];
+    getCurveControlPoints(cp);
+
+    const HitGroupData* data = (HitGroupData*)optixGetSbtDataPointer();
+    const float3 rayOrg = optixGetObjectRayOrigin();
+    const float3 rayDir = optixGetObjectRayDirection();
+    const float rayTmin = optixGetRayTmin();
+    const float rayTmax = optixGetRayTmax();
+
+    EmbreeRayHit rayHit;
+    rayHit.org = rayOrg;
+    rayHit.dir = rayDir;
+    rayHit.tnear = rayTmin;
+    rayHit.tfar = rayTmax;
+    rayHit.Ng = {0.f, 0.f, 0.f};
+    rayHit.u = 0.f;
+    rayHit.v = 0.f;
+
+    RoundBezierCurveEpilog epilog(&rayHit);
+
+    SweepCurveIntersector intersector;
+    if (intersector.intersect(rayHit,
+                              cp[0], cp[1], cp[2], cp[3],
+                              epilog)) {
+        optixReportIntersection(rayHit.tfar,
+                                0,
+                                asInt(rayHit.Ng.x),
+                                asInt(rayHit.Ng.y),
+                                asInt(rayHit.Ng.z),
+                                asInt(rayHit.u));
+    }
+}
+
+extern "C" __global__
 void __intersection__flat_linear_curve()
 {
+    // Based on PBRT
+
     const HitGroupData* data = (HitGroupData*)optixGetSbtDataPointer();
     const unsigned int primIdx = optixGetPrimitiveIndex();
 
@@ -866,6 +989,106 @@ void __intersection__flat_linear_curve()
         optixReportIntersection(t,
                                 0,
                                 asInt(u));
+    }
+}
+
+extern "C" __global__
+void __intersection__round_linear_curve()
+{
+    // Calls into ported Embree code
+
+    const HitGroupData* data = (HitGroupData*)optixGetSbtDataPointer();
+    const unsigned int primIdx = optixGetPrimitiveIndex();
+
+    const float3 rayOrg = optixGetObjectRayOrigin();
+    const float3 rayDir = optixGetObjectRayDirection();
+    const float rayTmin = optixGetRayTmin();
+    const float rayTmax = optixGetRayTmax();
+    const float dirLength = length(rayDir);
+
+    const int motionSamplesCount = data->curve.mMotionSamplesCount;
+    float4 cp[2];
+    float4 cpL, cpR;
+    if (motionSamplesCount == 1) {
+        unsigned int cpIdx = data->curve.mIndices[primIdx];
+        cp[0] = data->curve.mControlPoints[cpIdx];
+        cp[1] = data->curve.mControlPoints[cpIdx + 1];
+        cpL = { inf, inf, inf, inf };
+        if (primIdx > 0) {
+            unsigned int cpLeftIdx = data->curve.mIndices[primIdx - 1];
+            if ((cpLeftIdx + 1) == cpIdx) {
+                // Curve continues to the left
+                // From embree docs: left segment exists if segment(id-1)+1 == segment(id)
+                cpL = data->curve.mControlPoints[cpLeftIdx];
+            }
+        }
+        cpR = { inf, inf, inf, inf };
+        if (primIdx + 1 < data->curve.mNumIndices) {
+            unsigned int cpRightIdx = data->curve.mIndices[primIdx + 1];
+            if ((cpRightIdx - 1) == cpIdx) {
+                // Curve continues to the right
+                // From embree docs: right segment exists if segment(id+1)-1 == segment(id)
+                cpR = data->curve.mControlPoints[cpRightIdx];
+            }
+        }
+    } else {
+        const float time = optixGetRayTime();
+        const float sample0PlusT = time * (motionSamplesCount - 1);
+        const unsigned int sample0 = static_cast<unsigned int>(sample0PlusT);
+        const unsigned int sample1 = fminf(sample0 + 1, motionSamplesCount - 1); // clamp to time = 1
+        const float t = sample0PlusT - static_cast<float>(sample0);
+        unsigned int cpIdx = data->curve.mIndices[primIdx];
+        const float4* cp0 = data->curve.mControlPoints + data->curve.mNumControlPoints * sample0 +
+                                                         cpIdx;
+        const float4* cp1 = data->curve.mControlPoints + data->curve.mNumControlPoints * sample1 +
+                                                         cpIdx;
+        cp[0] = lerp(cp0[0], cp1[0], t);
+        cp[1] = lerp(cp0[1], cp1[1], t);
+        cpL = { inf, inf, inf, inf };
+        if (primIdx > 0) {
+            unsigned int cpLeftIdx = data->curve.mIndices[primIdx - 1];
+            if ((cpLeftIdx + 1) == cpIdx) {
+                // Curve continues to the left
+                float4 cpL0 = data->curve.mControlPoints[data->curve.mNumControlPoints * sample0 + cpLeftIdx];
+                float4 cpL1 = data->curve.mControlPoints[data->curve.mNumControlPoints * sample1 + cpLeftIdx];
+                cpL = lerp(cpL0, cpL1, t);
+            }
+        }
+        cpR = { inf, inf, inf, inf };
+        if (primIdx + 1 < data->curve.mNumIndices) {
+            unsigned int cpRightIdx = data->curve.mIndices[primIdx + 1];
+            if ((cpRightIdx - 1) == cpIdx) {
+                // Curve continues to the right
+                float4 cpR0 = data->curve.mControlPoints[data->curve.mNumControlPoints * sample0 + cpRightIdx];
+                float4 cpR1 = data->curve.mControlPoints[data->curve.mNumControlPoints * sample1 + cpRightIdx];
+                cpR = lerp(cpR0, cpR1, t);
+            }
+        }
+    }
+
+    EmbreeRayHit rayHit;
+    rayHit.org = rayOrg;
+    rayHit.dir = rayDir;
+    rayHit.tnear = rayTmin;
+    rayHit.tfar = rayTmax;
+    rayHit.Ng = {0.f, 0.f, 0.f};
+    rayHit.u = 0.f;
+    rayHit.v = 0.f;
+
+    RoundLinearCurveEpilog epilog(&rayHit);
+
+    RoundLinearCurveIntersector intersector;
+    if (intersector.intersect(true,
+                              rayHit,
+                              cp[0], cp[1],
+                              cpL, cpR,
+                              epilog)) {
+        optixReportIntersection(rayHit.tfar,
+                                0,
+                                asInt(rayHit.Ng.x),
+                                asInt(rayHit.Ng.y),
+                                asInt(rayHit.Ng.z),
+                                asInt(rayHit.u));
     }
 }
 
@@ -938,8 +1161,8 @@ void __intersection__sphere()
 
     const HitGroupData* data = (HitGroupData*)optixGetSbtDataPointer();
 
-    const float3 rayOrigin = data->sphere.mP2L.transformPoint(optixGetObjectRayOrigin());
-    const float3 rayDir = data->sphere.mP2L.transformVector(optixGetObjectRayDirection());
+    const float3 org = data->sphere.mP2L.transformPoint(optixGetObjectRayOrigin());
+    const float3 dir = data->sphere.mP2L.transformVector(optixGetObjectRayDirection());
     const float rayTnear = optixGetRayTmin();
     const float rayTfar = optixGetRayTmax();
 
@@ -947,18 +1170,24 @@ void __intersection__sphere()
     const bool isNormalReversed = data->mIsNormalReversed;
     const float radius = data->sphere.mRadius;
 
-    // compute quadratic sphere coefficients
-    const float A = dot(rayDir, rayDir);
-    const float B = dot(rayOrigin, rayDir);
-    // Note all the 0.5 and 2 and 4 terms can (and have) been removed as they cancel
-    const float C = dot(rayOrigin, rayOrigin) - radius * radius;
-    // solve quadratic equation for t values
-    const float D = B * B - A * C;
-    if (D < 0.0f) {
+    // Compute quadratic sphere coefficients.
+    // Note: we eliminate some multiplies by halving B relative to the pbrt treatment,
+    // so that the equation we're solving is now A*t^2 + 2*B*t + C = 0.
+    // Also, calcs for C and D are deferred till after testing for real roots.
+    float A = dot(dir, dir);
+    float B = dot(org, dir);
+    // More precise discriminant calculation to replace D = B * B - A * C;
+    // see PBRT4 section 6.8.3 for details.
+    float3 v = org - (B / A) * dir;
+    float vlen = length(v);
+    // This tests if the discriminant D is negative, without actually calculating it
+    if (radius < vlen) {
         return;
     }
-    const float rootDiscrim = sqrtf(D);
-    float q = (B < 0.0f ? rootDiscrim : -rootDiscrim) - B;
+    float C = dot(org, org) - radius * radius;
+    float D = A * (radius + vlen) * (radius - vlen);
+    float rootDiscrim = sqrtf(D);
+    float q = B < 0.0f ? rootDiscrim - B : -rootDiscrim - B;
     float t0 = q / A;
     float t1 = C / q;
     if (t0 > t1) {
@@ -976,13 +1205,15 @@ void __intersection__sphere()
         }
     }
     // compute hit position and phi
-    float3 pHit = rayOrigin + tHit * rayDir;
+    float3 pHit = org + tHit * dir;
+    // Refine sphere intersection point (PBRT4)
+    pHit = pHit * (radius / length(pHit));
     if (pHit.x == 0.0f && pHit.y == 0.0f) {
         pHit.x = 1e-5f * radius;
     }
     float phi = atan2f(pHit.y, pHit.x);
     if (phi < 0.0f) {
-        phi += 2.f * M_PI;
+        phi += 2.f * static_cast<float>(M_PI);
     }
     float zMin = data->sphere.mZMin;
     float zMax = data->sphere.mZMax;
@@ -996,13 +1227,15 @@ void __intersection__sphere()
             return;
         }
         tHit = t1;
-        pHit = rayOrigin + tHit * rayDir;
+        pHit = org + tHit * dir;
+        // Refine sphere intersection point (PBRT4)
+        pHit = pHit * (radius / length(pHit));
         if (pHit.x == 0.0f && pHit.y == 0.0f) {
             pHit.x = 1e-5f * radius;
         }
         phi = atan2f(pHit.y, pHit.x);
         if (phi < 0.0f) {
-            phi += 2.f * M_PI;
+            phi += 2.f * static_cast<float>(M_PI);
         }
         if (pHit.z < zMin || pHit.z > zMax || phi > phiMax) {
             return;

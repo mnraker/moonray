@@ -36,7 +36,8 @@ fillOcclRay(       uniform PbrTLState *      uniform pbrTls,
              const varying RayState &                rayState,
                    varying uint32_t                  dataPtrHandle,
                    varying OcclTestType              occlTestType,
-             const varying int32_t                   assignmentId)
+             const varying int32_t                   assignmentId,
+                   varying float                     lsmpVisibility)
 {
     uniform uint32_t numNewEntries = 0;
 
@@ -65,7 +66,8 @@ fillOcclRay(       uniform PbrTLState *      uniform pbrTls,
                             rayState.mCryptoRefN,
                             rayState.mCryptoUV,
                             occlTestType,
-                            assignmentId);
+                            assignmentId,
+                            lsmpVisibility);
         PbrTLState_acquireDeepData(pbrTls, dst->mDeepDataHandle);
         PbrTLState_acquireCryptomatteData(pbrTls, dst->mCryptomatteDataHandle);
 
@@ -113,8 +115,10 @@ prepareOcclusionTestRays(
               varying BundledOcclRay *  uniform dstPresenceShadowRays,
               uniform uint32_t *        uniform dstPresenceShadowsRayIndices,
               uniform uint32_t &                numPresenceShadowsRays,
+        const varying float                     presenceQuality,
               varying OcclTestType &            occlTestType,
-              const varying Intersection &      isect)
+              const varying Intersection &      isect,
+              varying float lsmpVisibility)
 {
     // Presence handling code for direct lighting
     // The shadow ray will be submitted to its own
@@ -143,6 +147,11 @@ prepareOcclusionTestRays(
     // if falloff enabled, don't shorten ray -- instead, use color interpolation (more expensive)
     float clearRadius = light->mClearRadiusFalloffDistance > 0.f ? 0.f : light->mClearRadius;
 
+    // offset shadow ray from surface, using the max of:
+    // 1) rayEpsilon/shadowRayEpsilon, which are geometry-based, and
+    // 2) minShadowDistance, which is light-based
+    rayEpsilon = max(rayEpsilon, light->mMinShadowDistance);
+
     // 2 * rayEpsilon ensures that the ray has non-zero length. 
     // Zero length shadow rays are not queued, which in this case we don't want.
     maxT = max((distance - clearRadius) * sHitEpsilonEnd, rayEpsilon * 2);
@@ -152,28 +161,30 @@ prepareOcclusionTestRays(
 
     int32_t assignmentId = isect.mLayerAssignmentId;
 
+    // pass in light for shadow linking purpose
+    b->mLight = light;
     if (light->mPresenceShadows) {
         // These members are for presence shadows
         b->mRayEpsilon = rayEpsilon;
-        // pass in light for shadow linking purpose
-        b->mLight = light;
+        // Check PathVertex.pathThroughput to decide if stochastic presence can be used
+        if (luminance(rayState.mPathVertex.pathThroughput) < (1.0f - presenceQuality)) {
+            b->mFlags |= STOCHASTIC_PRESENCE;
+        }
         numPresenceShadowsRays += fillOcclRay(pbrTls,
             dstPresenceShadowRays,
             &dstPresenceShadowsRayIndices[numPresenceShadowsRays],
             srcRayIndices,
             parentRay, wi,
             rayEpsilon, maxT,
-            tDirect, rayState, bundledOcclRayData, occlTestType, assignmentId);
+            tDirect, rayState, bundledOcclRayData, occlTestType, assignmentId, lsmpVisibility);
     } else {
-        // pass in light for shadow linking purpose
-        b->mLight = light;
         numOcclRays += fillOcclRay(pbrTls,
             dstOcclRays,
             &dstOcclRayIndices[numOcclRays],
             srcRayIndices,
             parentRay, wi,
             rayEpsilon, maxT,
-            tDirect, rayState, bundledOcclRayData, occlTestType, assignmentId);
+            tDirect, rayState, bundledOcclRayData, occlTestType, assignmentId, lsmpVisibility);
     }
 }
 
@@ -254,7 +265,7 @@ addDirectVisibleBsdfLobeSampleContributionBundled( const uniform PathIntegrator 
         rayEpsilon, shadowRayEpsilon, currSamp->wi, currSamp->tDirect, currSamp->distance, bundledOcclRayData,
         srcOcclRayIndices, dstOcclRays, dstOcclRayIndices, numOcclRays,
         presenceShadowsRays, dstPresenceShadowsRayIndices,
-        numPresenceShadowsRays, occlTestType, isect);
+        numPresenceShadowsRays, this->mPresenceQuality, occlTestType, isect, 1.0);
 }
 
 
@@ -313,6 +324,7 @@ void addDirectVisibleLightSampleContributionsBundled(       uniform PbrTLState *
                                                             varying BundledOcclRay * uniform presenceShadowsRays,
                                                             uniform uint32_t *       uniform dstPresenceShadowsRayIndices,
                                                             uniform uint32_t &               numPresenceShadowsRays,
+                                                      const varying float                    presenceQuality,
                                                       const varying Intersection &           isect,
                                                       const uniform Light *          uniform light,
                                                             uniform int &                    lightSamplesSoFar)
@@ -350,7 +362,7 @@ void addDirectVisibleLightSampleContributionsBundled(       uniform PbrTLState *
 
                 // LightSample contains up to BSDF_MAX_LOBE
                 for (uniform int i = 0; i < BSDF_MAX_LOBE; ++i) {
-                    if (!isActive(lp.lobe[i])) {
+                    if (!isActive(lp.lobe[i]) || !LightSample_isLobeValid(currSamp, i)) {
                         lpeStateId[i] = -1;
                         continue;
                     }
@@ -401,7 +413,7 @@ void addDirectVisibleLightSampleContributionsBundled(       uniform PbrTLState *
                 &dstOcclRays[lightSamplesSoFar], dstOcclRayIndices,
                 numOcclRays,
                 &presenceShadowsRays[lightSamplesSoFar], dstPresenceShadowsRayIndices,
-                numPresenceShadowsRays, occlTestType, isect);
+                numPresenceShadowsRays, presenceQuality, occlTestType, isect, currSamp->visibility);
         }
 
         // TODO: Ray debugging.
@@ -488,7 +500,7 @@ sampleAndAddDirectLightContributionsBundled( const uniform PathIntegrator * unif
         // ---------------- Trace shadow rays and add any light sample contributions -----------------------------------
         addDirectVisibleLightSampleContributionsBundled(pbrTls, lSampler, lsmp, parentRay, rayEpsilon, shadowRayEpsilon,
                 sp, pv, rayState, srcRayIndices, dstOcclRays, dstOcclRayIndices, numOcclRays, presenceShadowsRays,
-                dstPresenceShadowsRayIndices, numPresenceShadowsRays, isect, light, lightSamplesSoFar);
+                dstPresenceShadowsRayIndices, numPresenceShadowsRays, this->mPresenceQuality, isect, light, lightSamplesSoFar);
     }
 
     // tldr; Add inactive lights to the visibility aov
@@ -617,20 +629,7 @@ addIndirectOrDirectVisibleContributionsBundled( const uniform PathIntegrator * u
                 continue;
             }
 
-            // We have some self-intersections when rays leave at grazing
-            // angle, so we adjust the rayEpsilon accordingly.
-            // We only trace up to the currSamp->distance. It is set to the distance
-            // to the intersected light in this direction, if any.
             varying BsdfSample *uniform currSamp = &bsmp[s];
-            const varying float denom = abs(dot(getNg(isect), currSamp->wi));
-            // isect.getNg() itself or the dot product above can be zero.
-            const varying float start = isZero(denom) ? rayEpsilon : rayEpsilon / denom;
-            float varying end = (currSamp->distance == sMaxValue  ?  sMaxValue  :
-                                 currSamp->distance * sHitEpsilonEnd);
-
-            if (end <= start) {
-                continue;
-            }
 
             // Check transparency threshold
             varying float newAccumOpacity;
@@ -702,10 +701,16 @@ addIndirectOrDirectVisibleContributionsBundled( const uniform PathIntegrator * u
                 }
             }
 
+            // We have some self-intersections when rays leave at grazing
+            // angle, so we adjust the rayEpsilon accordingly.
+            const varying float denom = abs(dot(getNg(isect), currSamp->wi));
+            // isect.getNg() itself or the dot product above can be zero.
+            const varying float start = isZero(denom) ? rayEpsilon : rayEpsilon / denom;
+
             // Prepare a RayDifferential
             // Ray::depth is incremented inside of this call.
             RayDifferential &ray = rayState->mRay;
-            Ray_init(&ray, parentRay, start, end);
+            Ray_init(&ray, parentRay, start, sMaxValue);
 
             // Scatter and scale our next ray differential
             // We scatter the ray based on the sampled lobe

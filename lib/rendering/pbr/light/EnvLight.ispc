@@ -4,6 +4,7 @@
 
 #include "Light.isph"
 
+#include <moonray/rendering/pbr/core/RayState.isph>
 #include <moonray/rendering/shading/ispc/Util.isph>
 #include <scene_rdl2/common/platform/IspcUtil.isph>
 
@@ -117,11 +118,13 @@ EnvLight_globalToLocalXform(const uniform EnvLight * uniform light, varying floa
 varying bool
 EnvLight_canIlluminate(const uniform Light * uniform li, const varying Vec3f &p, const varying Vec3f &cullingNormal,
                        varying float time, varying float radius,
-                       const uniform LightFilterList * uniform lightFilterList)
+                       const uniform LightFilterList * uniform lightFilterList,
+                       const varying PathVertex * uniform pv)
 {
     const uniform EnvLight * uniform light = (const uniform EnvLight * uniform)li;
     MNRY_ASSERT(li->mOn);
-    return true;
+    // Only illuminate if we are not using a PortalLight
+    return !li->mHasPortal;
 }
 
 varying bool
@@ -205,8 +208,8 @@ varying Color
 EnvLight_eval(const uniform Light * uniform li, uniform ShadingTLState * uniform tls, const varying Vec3f &wi,
               const varying Vec3f &p, const varying LightFilterRandomValues& filterR, varying float time,
               const varying LightIntersection &isect, uniform bool fromCamera,
-              const uniform LightFilterList * uniform lightFilterList, varying float rayDirFootprint,
-              varying float * uniform pdf)
+              const uniform LightFilterList * uniform lightFilterList, const varying PathVertex * uniform pv,
+              varying float rayDirFootprint, varying float * uniform visibility, varying float * uniform pdf)
 {
     const uniform EnvLight * uniform light = (const uniform EnvLight * uniform)li;
 
@@ -227,14 +230,15 @@ EnvLight_eval(const uniform Light * uniform li, uniform ShadingTLState * uniform
         evalData.isect = &isect;
         evalData.lightPosition = Light_getPosition(li, time);
         evalData.lightDirection = Light_getDirection(li, time);
+        evalData.pv = pv;
         evalData.shadingPointPosition = p;
-        evalData.randVar = filterR; 
+        evalData.randVar = filterR;
         evalData.time = time;
         evalData.lightRender2LocalXform = EnvLight_globalToLocalXform(
             light, time, LightFilterList_getNeedsLightXform(lightFilterList));
         evalData.wi = wi;
 
-        LightFilterList_eval(lightFilterList, evalData, &radiance);
+        LightFilterList_eval(lightFilterList, evalData, visibility, &radiance);
     }
 
     if (pdf) {
@@ -264,9 +268,14 @@ inline uniform float EnvLight_getThetaE(const uniform Light * uniform li) { retu
 export void
 EnvLight_init(uniform EnvLight * uniform light)
 {
-    Light_init((uniform Light * uniform)light, EnvLight_canIlluminate,
-                EnvLight_intersect, EnvLight_sample, EnvLight_eval,
-                EnvLight_getThetaO, EnvLight_getThetaE);
+    Light_init((uniform Light * uniform)light,
+               LIGHT_TYPE_ENV,
+               EnvLight_canIlluminate,
+               EnvLight_intersect,
+               EnvLight_sample,
+               EnvLight_eval,
+               EnvLight_getThetaO,
+               EnvLight_getThetaE);
 }
 
 //----------------------------------------------------------------------------

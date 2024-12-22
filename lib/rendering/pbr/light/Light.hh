@@ -6,6 +6,21 @@
 
 #include <scene_rdl2/common/platform/HybridUniformData.hh>
 
+
+enum LightType
+{
+    LIGHT_TYPE_CYLINDER = 0,
+    LIGHT_TYPE_DISK,
+    LIGHT_TYPE_DISTANT,
+    LIGHT_TYPE_ENV,
+    LIGHT_TYPE_MESH,
+    LIGHT_TYPE_PORTAL,
+    LIGHT_TYPE_RECT,
+    LIGHT_TYPE_SPHERE,
+    LIGHT_TYPE_SPOT,
+};
+
+
 // values for Light::mMb
 #define LIGHT_MB_NONE        (0)      // light has no blurred motion
 #define LIGHT_MB_TRANSLATION (1 << 0) // light has blurred translational change
@@ -47,6 +62,8 @@ enum LightSidednessType
                                                                             \
     /* Backpointer to the rdl2 light */                                     \
     HUD_CPP_PTR(const scene_rdl2::rdl2::Light *, mRdlLight);                \
+                                                                            \
+    HUD_MEMBER(int8_t, mType);                                              \
                                                                             \
     /* Set to false if the "on" attribute was set to false or there was */  \
     /* a problem updating the light. */                                     \
@@ -105,7 +122,12 @@ enum LightSidednessType
     HUD_MEMBER(float, mClearRadius);                                        \
     HUD_MEMBER(float, mClearRadiusFalloffDistance);                         \
     HUD_MEMBER(float, mClearRadiusInterpolation);                           \
+    /* Max distance from shadow caster at which the light can cast shadows*/\
     HUD_MEMBER(float, mMaxShadowDistance);                                  \
+    /* Min distance from shadow caster at which the light can cast shadows*/\
+    HUD_MEMBER(float, mMinShadowDistance);                                  \
+    /* Does this light have an associated PortalLight? */                   \
+    HUD_MEMBER(bool, mHasPortal);                                           \
     /* Index in the scene's light list -- used for updating stats */        \
     HUD_MEMBER(uint32_t, mSceneIndex)
 
@@ -118,6 +140,7 @@ enum LightSidednessType
     HUD_VALIDATE(Light, mEvalFn);                       \
     HUD_VALIDATE(Light, mRdlLight);                     \
     HUD_VALIDATE(Light, mOn);                           \
+    HUD_VALIDATE(Light, mType);                         \
     HUD_VALIDATE(Light, mIsVisibleInCamera);            \
     HUD_VALIDATE(Light, mIsOpaqueInAlpha);              \
     HUD_VALIDATE(Light, mMb);                           \
@@ -139,6 +162,8 @@ enum LightSidednessType
     HUD_VALIDATE(Light, mClearRadiusFalloffDistance);   \
     HUD_VALIDATE(Light, mClearRadiusInterpolation);     \
     HUD_VALIDATE(Light, mMaxShadowDistance);            \
+    HUD_VALIDATE(Light, mMinShadowDistance);            \
+    HUD_VALIDATE(Light, mHasPortal);                    \
     HUD_VALIDATE(Light, mSceneIndex);                   \
     HUD_END_VALIDATION
 
@@ -297,6 +322,21 @@ enum LightSidednessType
     HUD_VALIDATE(MeshLight, mMapShader);          \
     HUD_END_VALIDATION
 
+
+//----------------------------------------------------------------------------
+
+#define PORTAL_LIGHT_MEMBERS                                            \
+    /* The Light we want to use the PortalLight on */                   \
+    HUD_PTR(Light*, mRefLight);                                         \
+    /* The scene_rdl2 version of mRefLight */                           \
+    HUD_CPP_PTR(scene_rdl2::rdl2::Light*, mRefRdlLight)
+
+
+#define PORTAL_LIGHT_VALIDATION                                         \
+    HUD_BEGIN_VALIDATION(PortalLight);                                  \
+    HUD_VALIDATE(PortalLight, mRefLight);                               \
+    HUD_VALIDATE(PortalLight, mRefRdlLight);                            \
+    HUD_END_VALIDATION
 
 //----------------------------------------------------------------------------
 

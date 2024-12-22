@@ -4,6 +4,7 @@
 
 #include "EnvLight.h"
 #include <moonray/rendering/pbr/core/Distribution.h>
+#include <moonray/rendering/pbr/core/RayState.h>
 
 #include <moonray/rendering/pbr/light/EnvLight_ispc_stubs.h>
 #include <moonray/rendering/shading/Util.h>
@@ -126,8 +127,6 @@ EnvLight::EnvLight(const scene_rdl2::rdl2::Light* rdlLight) :
     Light(rdlLight),
     mHemispherical(false)
 {
-    mIsOpaqueInAlpha = false;
-
     initAttributeKeys(rdlLight->getSceneClass());
 
     ispc::EnvLight_init(this->asIspc());
@@ -150,6 +149,7 @@ EnvLight::update(const Mat4d& world2render)
     updateRayTermination();
     updateTextureFilter();
     updateMaxShadowDistance();
+    updateMinShadowDistance();
 
     const Mat4d l2w0 = mRdlLight->get(scene_rdl2::rdl2::Node::sNodeXformKey, /* rayTime = */ 0.0f);
     const Mat4d l2w1 = mRdlLight->get(scene_rdl2::rdl2::Node::sNodeXformKey, /* rayTime = */ 1.0f);
@@ -297,8 +297,8 @@ EnvLight::sample(const Vec3f &p, const Vec3f *n, float time, const Vec3f& r,
 
 Color
 EnvLight::eval(mcrt_common::ThreadLocalState* tls, const Vec3f &wi, const Vec3f &p, const LightFilterRandomValues& filterR, float time,
-        const LightIntersection &isect, bool fromCamera, const LightFilterList *lightFilterList, float rayDirFootprint,
-        float *pdf) const
+        const LightIntersection &isect, bool fromCamera, const LightFilterList *lightFilterList, const PathVertex *pv, float rayDirFootprint,
+        float *visibility, float *pdf) const
 {
     MNRY_ASSERT(mOn);
 
@@ -313,11 +313,12 @@ EnvLight::eval(mcrt_common::ThreadLocalState* tls, const Vec3f &wi, const Vec3f 
         evalLightFilterList(lightFilterList,
                             { tls, &isect, getPosition(time),
                               getDirection(time), p,
-                              filterR, time,
+                              filterR, time, pv,
                               globalToLocalXform(time, lightFilterList->needsLightXform()),
                               wi
                             },
-                            radiance);
+                            radiance,
+                            visibility);
     }
 
     if (pdf) {

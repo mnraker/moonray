@@ -50,13 +50,15 @@ public:
                        const scene_rdl2::rdl2::Layer* layer,
                        const scene_rdl2::rdl2::Geometry* geometry,
                        OptixGPUPrimitiveGroup* parentGroup,
-                       SharedGroupMap& groups) :
+                       SharedGroupMap& groups,
+                       std::vector<void*>& instanceIdToInstancePtr) :
         mAllowUnsupportedFeatures(allowUnsupportedFeatures),
         mFailed(false),
         mLayer(layer),
         mGeometry(geometry),
         mParentGroup(parentGroup),
-        mSharedGroups(groups) {}
+        mSharedGroups(groups),
+        mInstanceIdToInstancePtr(instanceIdToInstancePtr) {}
 
     virtual void visitCurves(geom::Curves& c) override
     {
@@ -70,19 +72,19 @@ public:
         MNRY_ASSERT_REQUIRE(pImpl->getType() == geom::internal::Primitive::CURVES);
         const auto pCurves = static_cast<geom::internal::Curves*>(pImpl);
 
-        switch (pCurves->getSubType()) {
-        case geom::internal::Curves::SubType::RAY_FACING:
-            createCurves(*pCurves, c.getCurvesType(), c.getTessellationRate());
+        switch (c.getCurvesSubType()) {
+        case geom::Curves::SubType::RAY_FACING:
+            createCurves(*pCurves, c.getCurvesType(), geom::Curves::SubType::RAY_FACING, c.getTessellationRate());
         break;
-        case geom::internal::Curves::SubType::ROUND:
-            createRoundCurves(*pCurves, c.getCurvesType());
+        case geom::Curves::SubType::ROUND:
+            createCurves(*pCurves, c.getCurvesType(), geom::Curves::SubType::ROUND, c.getTessellationRate());
         break;
-        case geom::internal::Curves::SubType::NORMAL_ORIENTED:
+        case geom::Curves::SubType::NORMAL_ORIENTED:
             if (mAllowUnsupportedFeatures) {
                 logWarningMsg(
                     "Normal-oriented curves are not supported in XPU mode.  "
                     "Using ray-facing curves instead.");
-                createCurves(*pCurves, c.getCurvesType(), c.getTessellationRate());
+                createCurves(*pCurves, c.getCurvesType(), geom::Curves::SubType::RAY_FACING, c.getTessellationRate());
             } else {
                 mFailed = true;
                 mWhyFailed = "Normal-oriented curves are not supported in XPU mode";
@@ -201,7 +203,7 @@ public:
         // visit the referenced Primitive if it's not visited yet
         if (mSharedGroups.insert(std::make_pair(ref, nullptr)).second) {
             OptixGPUPrimitiveGroup *group = new OptixGPUPrimitiveGroup();
-            OptixGPUBVHBuilder builder(mAllowUnsupportedFeatures, mLayer, mGeometry, group, mSharedGroups);
+            OptixGPUBVHBuilder builder(mAllowUnsupportedFeatures, mLayer, mGeometry, group, mSharedGroups, mInstanceIdToInstancePtr);
             ref->getPrimitive()->accept(builder);
             // mark the BVH representation of referenced primitive (group)
             // has been correctly constructed so that all the instances
@@ -253,10 +255,8 @@ private:
 
     void createCurves(const geom::internal::Curves& geomCurves,
                       const geom::Curves::Type curvesType,
+                      const geom::Curves::SubType curvesSubType,
                       const int tessellationRate);
-
-    void createRoundCurves(const geom::internal::Curves& geomCurves,
-                           const geom::Curves::Type curvesType);
 
     void createPoints(const geom::internal::Points& geomPoints);
 
@@ -264,7 +264,7 @@ private:
 
     void createSphere(const geom::internal::Sphere& geomSphere);
 
-    void createInstance(const geom::internal::Instance& instance,
+    void createInstance(geom::internal::Instance& instance,
                         OptixGPUPrimitiveGroup* group);
 
     unsigned int resolveVisibilityMask(const geom::internal::NamedPrimitive& np) const;
@@ -283,6 +283,7 @@ private:
     const scene_rdl2::rdl2::Geometry* mGeometry;
     OptixGPUPrimitiveGroup* mParentGroup;
     SharedGroupMap& mSharedGroups;
+    std::vector<void*>& mInstanceIdToInstancePtr;
 };
 
 void
@@ -308,7 +309,7 @@ OptixGPUBVHBuilder::createBox(const geom::internal::Box& geomBox)
     gpuBox->mInputFlags = 0;
     gpuBox->mIsSingleSided = geomBox.getIsSingleSided();
     gpuBox->mIsNormalReversed = geomBox.getIsNormalReversed();
-    gpuBox->mVisibleShadow = resolveVisibilityMask(geomBox) & scene_rdl2::rdl2::SHADOW;
+    gpuBox->mMask = resolveVisibilityMask(geomBox);
     gpuBox->mEmbreeUserData = reinterpret_cast<intptr_t>(geomBox.mEmbreeUserData);
     gpuBox->mEmbreeGeomID = geomBox.mEmbreeGeomID;
 
@@ -343,8 +344,9 @@ OptixGPUBVHBuilder::createBox(const geom::internal::Box& geomBox)
 
 void
 OptixGPUBVHBuilder::createCurves(const geom::internal::Curves& geomCurves,
-                            const geom::Curves::Type curvesType,
-                            const int tessellationRate)
+                                 const geom::Curves::Type curvesType,
+                                 const geom::Curves::SubType curvesSubType,
+                                 const int tessellationRate)
 {
     geom::internal::Curves::Spans spans;
     geomCurves.getTessellatedSpans(spans);
@@ -355,7 +357,7 @@ OptixGPUBVHBuilder::createCurves(const geom::internal::Curves& geomCurves,
     gpuCurve->mInputFlags = 0;
     gpuCurve->mIsSingleSided = false;
     gpuCurve->mIsNormalReversed = false;
-    gpuCurve->mVisibleShadow = resolveVisibilityMask(geomCurves) & scene_rdl2::rdl2::SHADOW;
+    gpuCurve->mMask = resolveVisibilityMask(geomCurves);
     gpuCurve->mEmbreeUserData = reinterpret_cast<intptr_t>(geomCurves.mEmbreeUserData);
     gpuCurve->mEmbreeGeomID = geomCurves.mEmbreeGeomID;
 
@@ -374,6 +376,7 @@ OptixGPUBVHBuilder::createCurves(const geom::internal::Curves& geomCurves,
     }
 
     gpuCurve->mMotionSamplesCount = geomCurves.getMotionSamplesCount();
+    gpuCurve->mNumIndices = spans.mSpanCount;
     gpuCurve->mHostIndices.resize(spans.mSpanCount);
     gpuCurve->mNumControlPoints = spans.mVertexCount;
     gpuCurve->mHostControlPoints.resize(spans.mVertexCount * gpuCurve->mMotionSamplesCount);
@@ -387,6 +390,17 @@ OptixGPUBVHBuilder::createCurves(const geom::internal::Curves& geomCurves,
     break;
     case geom::Curves::Type::BSPLINE:
         gpuCurve->mBasis = BSPLINE; // the furdeform/willow default
+    break;
+    default:
+        MNRY_ASSERT_REQUIRE(false);
+    }
+
+    switch (curvesSubType) {
+    case geom::Curves::SubType::RAY_FACING:
+        gpuCurve->mSubType = RAY_FACING;
+    break;
+    case geom::Curves::SubType::ROUND:
+        gpuCurve->mSubType = ROUND;
     break;
     default:
         MNRY_ASSERT_REQUIRE(false);
@@ -434,150 +448,6 @@ OptixGPUBVHBuilder::createCurves(const geom::internal::Curves& geomCurves,
 }
 
 void
-OptixGPUBVHBuilder::createRoundCurves(const geom::internal::Curves& geomCurves,
-                                      const geom::Curves::Type curvesType)
-{
-    if (curvesType == geom::Curves::Type::BEZIER) {
-        // todo: this is supported in Optix 7.7
-        if (mAllowUnsupportedFeatures) {
-            logWarningMsg(
-                "Round bezier curves are currently unsupported in XPU mode.  "
-                "Ignoring geometry.");
-            return;
-        } else {
-            mFailed = true;
-            mWhyFailed = "Round bezier curves are currently unsupported in XPU mode";
-            return;
-        }
-    }
-
-    // This code assumes that there is a max of 2 motion samples.
-    // TODO: add support for round curves with more motion samples.
-    bool motionBlur = geomCurves.getMotionSamplesCount() > 1;
-    if (geomCurves.getMotionSamplesCount() > 2) {
-        if (mAllowUnsupportedFeatures) {
-            logWarningMsg(
-                "Round curves with more than 2 motion samples are currently unsupported in XPU mode.  "
-                "Only using first 2 samples.");
-        } else {
-            mFailed = true;
-            mWhyFailed = "Round curves with more than 2 motion samples are currently unsupported in XPU mode";
-            return;
-        }
-    }
-
-    geom::internal::Curves::Spans spans;
-    geomCurves.getTessellatedSpans(spans);
-
-    OptixGPURoundCurves* gpuCurve = new OptixGPURoundCurves();
-    if (!motionBlur) {
-        mParentGroup->mRoundCurves.push_back(gpuCurve);
-    } else {
-        mParentGroup->mRoundCurvesMB.push_back(gpuCurve);
-    }
-
-    gpuCurve->mInputFlags = 0;
-    gpuCurve->mIsSingleSided = false;
-    gpuCurve->mIsNormalReversed = false;
-    gpuCurve->mVisibleShadow = resolveVisibilityMask(geomCurves) & scene_rdl2::rdl2::SHADOW;
-    gpuCurve->mEmbreeUserData = reinterpret_cast<intptr_t>(geomCurves.mEmbreeUserData);
-    gpuCurve->mEmbreeGeomID = geomCurves.mEmbreeGeomID;
-
-    if (!getShadowLinkingLights(geomCurves,
-                                gpuCurve->mShadowLinkLights)) {
-        mFailed = true;
-        mWhyFailed = "There was a problem uploading the shadow linking light IDs to the GPU";
-        return;
-    }
-
-    if (!getShadowLinkingReceivers(geomCurves,
-                                   gpuCurve->mShadowLinkReceivers)) {
-        mFailed = true;
-        mWhyFailed = "There was a problem uploading the shadow linking receiver IDs to the GPU";
-        return;
-    }
-
-    gpuCurve->mMotionSamplesCount = geomCurves.getMotionSamplesCount();
-    if (gpuCurve->mMotionSamplesCount > 2) {
-        gpuCurve->mMotionSamplesCount = 2;
-    }
-
-    switch (curvesType) {
-    case geom::Curves::Type::LINEAR:
-        gpuCurve->mType = OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR;
-    break;
-    case geom::Curves::Type::BSPLINE:
-        gpuCurve->mType = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE;
-    break;
-    default:
-        MNRY_ASSERT_REQUIRE(false);
-    }
-
-    gpuCurve->mNumControlPoints = spans.mVertexCount;
-    const unsigned int* indices = reinterpret_cast<const unsigned int*>(spans.mIndexBufferDesc.mData);
-
-    std::vector<int> assignmentIds(spans.mSpanCount);
-    std::vector<unsigned int> hostIndices(spans.mSpanCount);
-    std::vector<float3> hostVertices(spans.mVertexCount * gpuCurve->mMotionSamplesCount);
-    std::vector<float> hostWidths(spans.mVertexCount * gpuCurve->mMotionSamplesCount);
-
-    for (size_t i = 0; i < spans.mSpanCount; i++) {
-        // We only want every third element of the index buffer to get the vertex index.
-        // See: geom/prim/Curves.h struct IndexData
-        hostIndices[i] = indices[i * 3];
-        assignmentIds[i] = geomCurves.getIntersectionAssignmentId(i);
-    }
-
-    const geom::Curves::VertexBuffer& verts = geomCurves.getVertexBuffer();
-
-    for (int ms = 0; ms < gpuCurve->mMotionSamplesCount; ms++) {
-        for (size_t i = 0; i < spans.mVertexCount; i++) {
-            const scene_rdl2::math::Vec3fa& cp = verts(i, ms);
-            hostVertices[ms * spans.mVertexCount + i] = {cp.x, cp.y, cp.z};
-            hostWidths[ms * spans.mVertexCount + i] = cp.w;
-        }
-    }
-
-    if (gpuCurve->mAssignmentIds.allocAndUpload(assignmentIds) != cudaSuccess) {
-        mFailed = true;
-        mWhyFailed = "There was a problem uploading the assignment IDs to the GPU";
-        return;
-    }
-
-    if (gpuCurve->mIndices.allocAndUpload(hostIndices) != cudaSuccess) {
-        mFailed = true;
-        mWhyFailed = "There was a problem uploading the curve indices to the GPU";
-        return;
-    }
-
-    if (gpuCurve->mVertices.allocAndUpload(hostVertices) != cudaSuccess) {
-        mFailed = true;
-        mWhyFailed = "There was a problem uploading the curve vertices to the GPU";
-        return;
-    }
-
-    if (gpuCurve->mWidths.allocAndUpload(hostWidths) != cudaSuccess) {
-        mFailed = true;
-        mWhyFailed = "There was a problem uploading the curve widths to the GPU";
-        return;
-    }
-
-    // Get the vertex/width buffer pointers.  For curves without motion blur, the
-    // second pointer is null.
-    gpuCurve->mVerticesPtrs[0] = gpuCurve->mVertices.deviceptr();
-    gpuCurve->mWidthsPtrs[0] = gpuCurve->mWidths.deviceptr();
-    if (gpuCurve->mMotionSamplesCount == 2) {
-        gpuCurve->mVerticesPtrs[1] = gpuCurve->mVertices.deviceptr() +
-                                     gpuCurve->mNumControlPoints * sizeof(float3);
-        gpuCurve->mWidthsPtrs[1] = gpuCurve->mWidths.deviceptr() +
-                                   gpuCurve->mNumControlPoints * sizeof(float);
-    } else {
-        gpuCurve->mVerticesPtrs[1] = 0;
-        gpuCurve->mWidthsPtrs[1] = 0;
-    }
-}
-
-void
 OptixGPUBVHBuilder::createPoints(const geom::internal::Points& geomPoints)
 {
     OptixGPUPoints* gpuPoints = new OptixGPUPoints();
@@ -586,7 +456,7 @@ OptixGPUBVHBuilder::createPoints(const geom::internal::Points& geomPoints)
     gpuPoints->mInputFlags = 0;
     gpuPoints->mIsSingleSided = false;
     gpuPoints->mIsNormalReversed = false;
-    gpuPoints->mVisibleShadow = resolveVisibilityMask(geomPoints) & scene_rdl2::rdl2::SHADOW;
+    gpuPoints->mMask = resolveVisibilityMask(geomPoints);
     gpuPoints->mEmbreeUserData = reinterpret_cast<intptr_t>(geomPoints.mEmbreeUserData);
     gpuPoints->mEmbreeGeomID = geomPoints.mEmbreeGeomID;
 
@@ -642,40 +512,35 @@ OptixGPUBVHBuilder::createPolyMesh(const geom::internal::Mesh& geomMesh)
     geom::internal::Mesh::TessellatedMesh mesh;
     geomMesh.getTessellatedMesh(mesh);
 
-    // This code assumes that there is a max of 2 motion samples
-    // TODO: add support for mesh with more motion samples.
+    if (mesh.mVertexCount == 0 || mesh.mFaceCount == 0) {
+        // Embree tolerates empty meshes but Optix does not
+        return;
+    }
+
     size_t mbSamples = mesh.mVertexBufferDesc.size();
-    const bool enableMotionBlur = mbSamples > 1;
-    if (mbSamples > 2) {
+    if (mbSamples > MAX_MOTION_BLUR_SAMPLES) { // 16
       if (mAllowUnsupportedFeatures) {
             logWarningMsg(
-                "Meshes with more than 2 motion samples are currently unsupported in XPU mode.  "
-                "Only using first 2 samples.");
-            mbSamples = 2;
+                "Meshes with more than 16 motion samples are currently unsupported in XPU mode.  "
+                "Only using first 16 samples.");
+            mbSamples = MAX_MOTION_BLUR_SAMPLES;
         } else {
             mFailed = true;
-            mWhyFailed = "Meshes with more than 2 motion samples are currently unsupported in XPU mode";
+            mWhyFailed = "Meshes with more than 16 motion samples are currently unsupported in XPU mode";
             return;
         }
     }
 
     OptixGPUTriMesh* gpuMesh = new OptixGPUTriMesh();
     gpuMesh->mName = geomMesh.getName();
-    if (enableMotionBlur) {
-        mParentGroup->mTriMeshesMB.push_back(gpuMesh);
-    } else {
-        mParentGroup->mTriMeshes.push_back(gpuMesh);
-    }
-
-    bool hasVolumeAssignment = geomMesh.hasVolumeAssignment(mLayer);
-
     gpuMesh->mInputFlags = 0;
-    gpuMesh->mIsSingleSided = geomMesh.getIsSingleSided() && !hasVolumeAssignment;
+    gpuMesh->mIsSingleSided = geomMesh.getIsSingleSided();
     gpuMesh->mIsNormalReversed = geomMesh.getIsNormalReversed();
-    gpuMesh->mVisibleShadow = resolveVisibilityMask(geomMesh) & scene_rdl2::rdl2::SHADOW;
-    gpuMesh->mEnableMotionBlur = enableMotionBlur;
+    gpuMesh->mMask = resolveVisibilityMask(geomMesh);
+    gpuMesh->mNumMotionBlurSamples = mbSamples;
     gpuMesh->mEmbreeUserData = reinterpret_cast<intptr_t>(geomMesh.mEmbreeUserData);
     gpuMesh->mEmbreeGeomID = geomMesh.mEmbreeGeomID;
+    mParentGroup->mTriMeshes[mbSamples].push_back(gpuMesh);
 
     if (!getShadowLinkingLights(geomMesh,
                                 gpuMesh->mShadowLinkLights)) {
@@ -713,16 +578,6 @@ OptixGPUBVHBuilder::createPolyMesh(const geom::internal::Mesh& geomMesh)
         gpuMesh->mNumVertices = mesh.mVertexCount;
         gpuMesh->mNumFaces = mesh.mFaceCount; 
 
-        // When a mesh uses motion blur, the vertices of each motion key are stored consecutively in a single buffer.
-        // According to Nvidia, GAS construction is most efficient when each motion buffer is 16-byte aligned. This
-        // isn't a problem for the first motion key buffer, but the second motion key buffer may not be correctly aligned.
-        // We handle that case here. Note that motionKeyOffsets is {0, 0} if there is no motion. This way, if some mesh
-        // don't support motion blur, their mVerticesPtrs will both point to the same buffer. Optix needs both pointers
-        // to point to a valid buffer.
-        const std::array<size_t, 2> motionKeyOffsets = {0, enableMotionBlur ? scene_rdl2::util::alignUp<size_t>(mesh.mVertexCount, 4) : 0};
-        const size_t gpuVerticesSize = motionKeyOffsets[1] + mesh.mVertexCount;
-        std::vector<float3> gpuVertices(gpuVerticesSize);
-
         std::vector<unsigned int> gpuIndices(mesh.mFaceCount * 3);
         const unsigned int* indices = reinterpret_cast<const unsigned int*>(mesh.mIndexBufferDesc.mData);
         std::vector<int> assignmentIds(mesh.mFaceCount);
@@ -735,26 +590,6 @@ OptixGPUBVHBuilder::createPolyMesh(const geom::internal::Mesh& geomMesh)
             gpuIndices[i * 3 + 2] = indices[i * 3 + 2];
         }
 
-        for (size_t ms = 0; ms < mbSamples; ms++) {
-            // Because the offset and stride members of mVertexBufferDesc are in bytes, we want to perform pointer
-            // arithmetic on pointers to char (or anything byte sized).
-            const char* vertices = reinterpret_cast<const char*>(mesh.mVertexBufferDesc[ms].mData);
-
-            const unsigned int offset = mesh.mVertexBufferDesc[ms].mOffset;
-            const unsigned int stride = mesh.mVertexBufferDesc[ms].mStride;
-            const size_t motionKeyOffset = motionKeyOffsets[ms];
-
-            for (size_t i = 0; i < mesh.mVertexCount; i++) {
-                scene_rdl2::math::Vec3fa vtx = *reinterpret_cast<const scene_rdl2::math::Vec3fa*>(&vertices[offset + stride * i]);
-                gpuVertices[motionKeyOffset + i] = {vtx.x, vtx.y, vtx.z};
-            }
-        }
-
-        if (gpuMesh->mVertices.allocAndUpload(gpuVertices) != cudaSuccess) {
-            mFailed = true;
-            mWhyFailed = "There was a problem uploading the vertices to the GPU";
-            return;
-        }
         if (gpuMesh->mIndices.allocAndUpload(gpuIndices) != cudaSuccess) {
             mFailed = true;
             mWhyFailed = "There was a problem uploading the indices to the GPU";
@@ -765,20 +600,11 @@ OptixGPUBVHBuilder::createPolyMesh(const geom::internal::Mesh& geomMesh)
             mWhyFailed = "There was a problem uploading the assignment IDs to the GPU";
             return;
         }
-
-        gpuMesh->mVerticesPtrs[0] = gpuMesh->mVertices.deviceptr();
-        gpuMesh->mVerticesPtrs[1] = gpuMesh->mVertices.deviceptr() + motionKeyOffsets[1] * sizeof(float3);
-
     } else if (vertsPerFace == 4) {
         // convert quads to tris
         gpuMesh->mWasQuads = true;
         gpuMesh->mNumVertices = mesh.mVertexCount;
         gpuMesh->mNumFaces = mesh.mFaceCount * 2;
-
-        // See above for reason this code exists:
-        const std::array<size_t, 2> motionKeyOffsets = {0, enableMotionBlur ? scene_rdl2::util::alignUp<size_t>(mesh.mVertexCount, 4) : 0};
-        const size_t gpuVerticesSize = motionKeyOffsets[1] + mesh.mVertexCount;
-        std::vector<float3> gpuVertices(gpuVerticesSize);
 
         std::vector<unsigned int> gpuIndices(mesh.mFaceCount * 6);
         const unsigned int* indices = reinterpret_cast<const unsigned int*>(mesh.mIndexBufferDesc.mData);
@@ -803,26 +629,6 @@ OptixGPUBVHBuilder::createPolyMesh(const geom::internal::Mesh& geomMesh)
             gpuIndices[i * 6 + 5] = idx1;
         }
 
-        for (size_t ms = 0; ms < mbSamples; ms++) {
-            // Because the offset and stride members of mVertexBufferDesc are in bytes, we want to perform pointer
-            // arithmetic on pointers to char (or anything byte sized).
-            const char* vertices = reinterpret_cast<const char*>(mesh.mVertexBufferDesc[ms].mData);
-
-            const unsigned int offset = mesh.mVertexBufferDesc[ms].mOffset;
-            const unsigned int stride = mesh.mVertexBufferDesc[ms].mStride;
-            const size_t motionKeyOffset = motionKeyOffsets[ms];
-
-            for (size_t i = 0; i < mesh.mVertexCount; i++) {
-                scene_rdl2::math::Vec3fa vtx = *reinterpret_cast<const scene_rdl2::math::Vec3fa*>(&vertices[offset + stride * i]);
-                gpuVertices[motionKeyOffset + i] = {vtx.x, vtx.y, vtx.z};
-            }
-        }
-
-        if (gpuMesh->mVertices.allocAndUpload(gpuVertices) != cudaSuccess) {
-            mFailed = true;
-            mWhyFailed = "There was a problem uploading the vertices to the GPU";
-            return;
-        }
         if (gpuMesh->mIndices.allocAndUpload(gpuIndices) != cudaSuccess) {
             mFailed = true;
             mWhyFailed = "There was a problem uploading the indices to the GPU";
@@ -833,9 +639,33 @@ OptixGPUBVHBuilder::createPolyMesh(const geom::internal::Mesh& geomMesh)
             mWhyFailed = "There was a problem uploading the assignment IDs to the GPU";
             return;
         }
+    }
 
-        gpuMesh->mVerticesPtrs[0] = gpuMesh->mVertices.deviceptr();
-        gpuMesh->mVerticesPtrs[1] = gpuMesh->mVertices.deviceptr() + motionKeyOffsets[1] * sizeof(float3);
+    for (size_t ms = 0; ms < mbSamples; ms++) {
+        // Because the offset and stride members of mVertexBufferDesc are in bytes, we want to perform pointer
+        // arithmetic on pointers to char (or anything byte sized).
+        const char* vertices = reinterpret_cast<const char*>(mesh.mVertexBufferDesc[ms].mData);
+
+        const unsigned int offset = mesh.mVertexBufferDesc[ms].mOffset;
+        const unsigned int stride = mesh.mVertexBufferDesc[ms].mStride;
+
+        std::vector<float3> gpuVertices(mesh.mVertexCount);
+
+        for (size_t i = 0; i < mesh.mVertexCount; i++) {
+            scene_rdl2::math::Vec3fa vtx =
+                *reinterpret_cast<const scene_rdl2::math::Vec3fa*>(&vertices[offset + stride * i]);
+            gpuVertices[i] = { vtx.x, vtx.y, vtx.z };
+        }
+
+        if (gpuMesh->mVertices[ms].allocAndUpload(gpuVertices) != cudaSuccess) {
+            mFailed = true;
+            mWhyFailed = "There was a problem uploading the vertices to the GPU";
+            return;
+        }
+    }
+
+    for (size_t ms = 0; ms < mbSamples; ms++) {
+        gpuMesh->mVerticesPtrs[ms] = gpuMesh->mVertices[ms].deviceptr();
     }
 }
 
@@ -850,7 +680,7 @@ OptixGPUBVHBuilder::createSphere(const geom::internal::Sphere& geomSphere)
     gpuSphere->mInputFlags = 0;
     gpuSphere->mIsSingleSided = geomSphere.getIsSingleSided();
     gpuSphere->mIsNormalReversed = geomSphere.getIsNormalReversed();
-    gpuSphere->mVisibleShadow = resolveVisibilityMask(geomSphere) & scene_rdl2::rdl2::SHADOW;
+    gpuSphere->mMask = resolveVisibilityMask(geomSphere);
     gpuSphere->mEmbreeUserData = reinterpret_cast<intptr_t>(geomSphere.mEmbreeUserData);
     gpuSphere->mEmbreeGeomID = geomSphere.mEmbreeGeomID;
 
@@ -885,8 +715,8 @@ OptixGPUBVHBuilder::createSphere(const geom::internal::Sphere& geomSphere)
 }
 
 void
-OptixGPUBVHBuilder::createInstance(const geom::internal::Instance& instance,
-                              OptixGPUPrimitiveGroup* group)
+OptixGPUBVHBuilder::createInstance(geom::internal::Instance& instance,
+                                   OptixGPUPrimitiveGroup* group)
 {
     const geom::internal::MotionTransform& l2pXform = instance.getLocal2Parent();
 
@@ -926,20 +756,14 @@ OptixGPUBVHBuilder::createInstance(const geom::internal::Instance& instance,
         mask |= mGeometry->getVisibilityMask() << scene_rdl2::rdl2::sNumVisibilityTypes;
     }
 
-    bool visibleShadow = mask & scene_rdl2::rdl2::SHADOW;
-    if (!visibleShadow) {
-        // Instance doesn't cast a shadow so it doesn't exist for occlusion
-        // queries.  Just skip it.  We will need to add some more logic when
-        // regular rays are supported by XPU.
-        return;
-    }
-
     OptixGPUInstance* gpuInstance = new OptixGPUInstance();
     mParentGroup->mInstances.push_back(gpuInstance);
     gpuInstance->mGroup = group;
-    // TODO
-    //gpuInstance->mEmbreeUserData = reinterpret_cast<intptr_t>(instance.mEmbreeUserData);
-    //gpuInstance->mEmbreeGeomID = instance.mEmbreeGeomID;
+    gpuInstance->mMask = mask;
+    gpuInstance->mEmbreeUserData = reinterpret_cast<intptr_t>(instance.mEmbreeUserData);
+    gpuInstance->mEmbreeGeomID = instance.mEmbreeGeomID;
+    gpuInstance->mInstanceId = static_cast<unsigned int>(mInstanceIdToInstancePtr.size());
+    mInstanceIdToInstancePtr.push_back(reinterpret_cast<void*>(&instance));
 
     if (hasMotionBlur) {
         for (int i = 0; i < OptixGPUInstance::sNumMotionKeys; i++) {
@@ -1037,12 +861,14 @@ OptixGPUAccelerator::OptixGPUAccelerator(bool allowUnsupportedFeatures,
     mNumCPUThreads {numCPUThreads},
     mContext {nullptr},
     mModule {nullptr},
-    mRoundLinearCurvesModule {nullptr},
-    mRoundLinearCurvesMBModule {nullptr},
-    mRoundCubicBsplineCurvesModule {nullptr},
-    mRoundCubicBsplineCurvesMBModule {nullptr},
     mRootGroup {nullptr}
 {
+    // id 0 is reserved to mean "not a regular MoonRay instance", hence there is no
+    // MoonRay instance pointer associated with the Id.  Recall that we need this mapping
+    // because Optix only supports a 32-bit instance ID but we need the original 64-bit
+    // MoonRay Instance* pointer from the ray intersection.
+    mInstanceIdToInstancePtr.push_back(nullptr);
+
     // The constructor fully initializes the GPU.  We are ready to trace rays afterwards.
 
     scene_rdl2::logging::Logger::info("GPU: Creating accelerator");
@@ -1066,9 +892,7 @@ OptixGPUAccelerator::OptixGPUAccelerator(bool allowUnsupportedFeatures,
     pipelineCompileOptions.pipelineLaunchParamsVariableName = "params";
     pipelineCompileOptions.usesPrimitiveTypeFlags = static_cast<unsigned int>(
         OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE |
-        OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM |
-        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR |
-        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE);
+        OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM);
 
     const std::string moonrayRootPath = scene_rdl2::util::getenv<std::string>("REZ_MOONRAY_ROOT");
     const std::string ptxPath = moonrayRootPath + "/shaders/OptixGPUPrograms.ptx";
@@ -1092,46 +916,6 @@ OptixGPUAccelerator::OptixGPUAccelerator(bool allowUnsupportedFeatures,
     }
 
     scene_rdl2::logging::Logger::info("GPU: Loading built in modules");
-
-    if (!getBuiltinISModule(mContext,
-                            moduleCompileOptions,
-                            pipelineCompileOptions,
-                            OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
-                            false,
-                            &mRoundLinearCurvesModule,
-                            errorMsg)) {
-        return;
-    }
-
-    if (!getBuiltinISModule(mContext,
-                            moduleCompileOptions,
-                            pipelineCompileOptions,
-                            OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
-                            true,
-                            &mRoundLinearCurvesMBModule,
-                            errorMsg)) {
-        return;
-    }
-
-    if (!getBuiltinISModule(mContext,
-                            moduleCompileOptions,
-                            pipelineCompileOptions,
-                            OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
-                            false,
-                            &mRoundCubicBsplineCurvesModule,
-                            errorMsg)) {
-        return;
-    }
-
-    if (!getBuiltinISModule(mContext,
-                            moduleCompileOptions,
-                            pipelineCompileOptions,
-                            OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
-                            true,
-                            &mRoundCubicBsplineCurvesMBModule,
-                            errorMsg)) {
-        return;
-    }
 
     scene_rdl2::logging::Logger::info("GPU: Creating program groups");
 
@@ -1252,22 +1036,6 @@ OptixGPUAccelerator::~OptixGPUAccelerator()
         optixModuleDestroy(mModule);
     }
 
-    if (mRoundLinearCurvesModule != nullptr) {
-        optixModuleDestroy(mRoundLinearCurvesModule);
-    }
-
-    if (mRoundLinearCurvesMBModule != nullptr) {
-        optixModuleDestroy(mRoundLinearCurvesMBModule);
-    }
-
-    if (mRoundCubicBsplineCurvesModule != nullptr) {
-        optixModuleDestroy(mRoundCubicBsplineCurvesModule);
-    }
-
-    if (mRoundCubicBsplineCurvesMBModule != nullptr) {
-        optixModuleDestroy(mRoundCubicBsplineCurvesMBModule);
-    }
-
     if (mContext != nullptr) {
         optixDeviceContextDestroy(mContext);
     }
@@ -1301,6 +1069,7 @@ buildGPUBVHBottomUp(bool allowUnsupportedFeatures,
                     OptixGPUPrimitiveGroup* rootGroup,
                     SharedGroupMap& groups,
                     std::unordered_set<scene_rdl2::rdl2::Geometry*>& visitedGeometry,
+                    std::vector<void*>& instanceIdToInstancePtr,
                     std::vector<std::string>& warningMsgs,
                     std::string* errorMsg)
 {
@@ -1330,6 +1099,7 @@ buildGPUBVHBottomUp(bool allowUnsupportedFeatures,
                             rootGroup,
                             groups,
                             visitedGeometry,
+                            instanceIdToInstancePtr,
                             warningMsgs,
                             errorMsg);
     }
@@ -1342,7 +1112,7 @@ buildGPUBVHBottomUp(bool allowUnsupportedFeatures,
             procedural->getReference();
         if (groups.insert(std::make_pair(ref, nullptr)).second) {
             OptixGPUPrimitiveGroup *group = new OptixGPUPrimitiveGroup();
-            OptixGPUBVHBuilder builder(allowUnsupportedFeatures, layer, geometry, group, groups);
+            OptixGPUBVHBuilder builder(allowUnsupportedFeatures, layer, geometry, group, groups, instanceIdToInstancePtr);
             ref->getPrimitive()->accept(builder);
             // mark the BVH representation of referenced primitive (group)
             // has been correctly constructed so that all the instances
@@ -1354,7 +1124,8 @@ buildGPUBVHBottomUp(bool allowUnsupportedFeatures,
                                        layer,
                                        geometry,
                                        rootGroup,
-                                       groups);
+                                       groups,
+                                       instanceIdToInstancePtr);
         procedural->forEachPrimitive(geomBuilder, doParallel);
         warningMsgs.insert(warningMsgs.end(),
                            geomBuilder.warningMsgs().begin(),
@@ -1396,6 +1167,7 @@ OptixGPUAccelerator::build(CUstream cudaStream,
                                      mRootGroup,
                                      mSharedGroups,
                                      visitedGeometry,
+                                     mInstanceIdToInstancePtr,
                                      warningMsgs,
                                      errorMsg)) {
                 return false;
@@ -1499,52 +1271,26 @@ OptixGPUAccelerator::createProgramGroups(std::string* errorMsg)
                                          "__anyhit__",
                                          mModule,
                                          "__closesthit__",
-                                         mRoundLinearCurvesModule,
-                                         nullptr,
+                                         mModule,
+                                         "__intersection__round_linear_curve",
                                          &pg,
                                          errorMsg)) {
         return false;
     }
-    mProgramGroups["roundLinearCurvesHG"] = pg;
+    mProgramGroups["roundLinearCurveHG"] = pg;
 
     if (!createOptixHitGroupProgramGroup(mContext,
                                          mModule,
                                          "__anyhit__",
                                          mModule,
                                          "__closesthit__",
-                                         mRoundLinearCurvesMBModule,
-                                         nullptr,
+                                         mModule,
+                                         "__intersection__round_bspline_curve",
                                          &pg,
                                          errorMsg)) {
         return false;
     }
-    mProgramGroups["roundLinearCurvesMBHG"] = pg;
-
-    if (!createOptixHitGroupProgramGroup(mContext,
-                                         mModule,
-                                         "__anyhit__",
-                                         mModule,
-                                         "__closesthit__",
-                                         mRoundCubicBsplineCurvesModule,
-                                         nullptr,
-                                         &pg,
-                                         errorMsg)) {
-        return false;
-    }
-    mProgramGroups["roundCubicBsplineCurvesHG"] = pg;
-
-    if (!createOptixHitGroupProgramGroup(mContext,
-                                         mModule,
-                                         "__anyhit__",
-                                         mModule,
-                                         "__closesthit__",
-                                         mRoundCubicBsplineCurvesMBModule,
-                                         nullptr,
-                                         &pg,
-                                         errorMsg)) {
-        return false;
-    }
-    mProgramGroups["roundCubicBsplineCurvesMBHG"] = pg;
+    mProgramGroups["roundBsplineCurveHG"] = pg;
 
     if (!createOptixHitGroupProgramGroup(mContext,
                                          mModule,
@@ -1738,6 +1484,12 @@ OptixGPUAccelerator::occluded(const uint32_t queueIdx,
         scene_rdl2::logging::Logger::error("GPU: cudaStreamSynchronize() error: ",
                             cudaGetErrorString(error));
     }
+}
+
+void*
+OptixGPUAccelerator::instanceIdToInstancePtr(unsigned int instanceId) const
+{
+    return mInstanceIdToInstancePtr[instanceId];
 }
 
 } // namespace rt

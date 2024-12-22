@@ -15,14 +15,24 @@ enum OcclTestType
     FORCE_NOT_OCCLUDED
 };
 
+enum BundledOcclRayDataFlags
+{
+    // As a future potential optimization, we could save a pointer de-reference
+    //  if we stored these flags in the upper bits of BundledOcclRay::mDataPtrIdx.
+    LPE                     = 1 << 0,
+    LIGHT_SAMPLE            = 1 << 1,
+    STOCHASTIC_PRESENCE     = 1 << 2    // indicates that the path throughput is low enough to use stochastic presence
+};
+
+
 //
 // BundledOcclRay:
 //
 
 #if __APPLE__
-#define BUNDLED_OCCL_RAY_MEMBERS_PAD (60+64) /*Alignment: 128, Total size: 132, Padded size: 256*/
+#define BUNDLED_OCCL_RAY_MEMBERS_PAD (60+60) /*Alignment: 128, Total size: 136, Padded size: 256*/
 #else
-#define BUNDLED_OCCL_RAY_MEMBERS_PAD  60 /*Alignment: 64, Total size: 132, Padded size: 192*/
+#define BUNDLED_OCCL_RAY_MEMBERS_PAD  56 /*Alignment: 64, Total size: 136, Padded size: 192*/
 #endif
 
 #define BUNDLED_OCCL_RAY_MEMBERS                                    /*  size  */\
@@ -46,6 +56,7 @@ enum OcclTestType
     HUD_MEMBER(HVD_NAMESPACE(scene_rdl2::math, Vec2f), mCryptoUV);  /*  124   */\
     HVD_MEMBER(uint32_t, mOcclTestType);                            /*  128   */\
     HVD_MEMBER(int32_t,  mShadowReceiverId);                        /*  132   */\
+    HVD_MEMBER(float, mLsmpVisibility);                             /*  136   */\
     HVD_ISPC_PAD(mIspcPad, BUNDLED_OCCL_RAY_MEMBERS_PAD)
 
 #define BUNDLED_OCCL_RAY_VALIDATION(vlen)                   \
@@ -70,6 +81,7 @@ enum OcclTestType
     HUD_VALIDATE(BundledOcclRay, mCryptoUV);                \
     HVD_VALIDATE(BundledOcclRay, mOcclTestType);            \
     HVD_VALIDATE(BundledOcclRay, mShadowReceiverId);        \
+    HVD_VALIDATE(BundledOcclRay, mLsmpVisibility);          \
     HVD_END_VALIDATION
 
 #define BUNDLED_OCCL_RAY_DATA_MEMBERS                                   \
@@ -265,6 +277,7 @@ enum OcclTestType
     HUD_MEMBER(uint32_t, mInitialSeed);                                     \
     HUD_MEMBER(int, mMaxPresenceDepth);                                     \
     HUD_MEMBER(float, mPresenceThreshold);                                  \
+    HUD_MEMBER(float, mPresenceQuality);                                    \
     HUD_PTR(const float *, mSamples1D);                                     \
     HUD_PTR(const Sample2D *, mSamples2D);                                  \
     HUD_MEMBER(HUD_NAMESPACE(shading, ShadowTerminatorFix), mShadowTerminatorFix);  \
@@ -291,6 +304,7 @@ enum OcclTestType
     HUD_VALIDATE(FrameState, mInitialSeed);                     \
     HUD_VALIDATE(FrameState, mMaxPresenceDepth);                \
     HUD_VALIDATE(FrameState, mPresenceThreshold);               \
+    HUD_VALIDATE(FrameState, mPresenceQuality);                 \
     HUD_VALIDATE(FrameState, mSamples1D);                       \
     HUD_VALIDATE(FrameState, mSamples2D);                       \
     HUD_VALIDATE(FrameState, mShadowTerminatorFix);             \

@@ -42,7 +42,6 @@ Light::Light(const scene_rdl2::rdl2::Light* rdlLight) :
     mRdlLight(rdlLight),
     mOn(false),
     mIsVisibleInCamera(false),
-    mIsOpaqueInAlpha(true),
     mMb(LIGHT_MB_NONE),
     mArea(1.0f),
     mInvArea(1.0f),
@@ -57,7 +56,8 @@ Light::Light(const scene_rdl2::rdl2::Light* rdlLight) :
     mTextureFilter(TEXTURE_FILTER_NEAREST),
     mClearRadius(0.f),
     mClearRadiusFalloffDistance(0.f),
-    mClearRadiusInterpolation(0)
+    mClearRadiusInterpolation(0),
+    mHasPortal(false)
 {
     MNRY_ASSERT(rdlLight);
 }
@@ -213,6 +213,12 @@ void
 Light::updateMaxShadowDistance()
 {
     mMaxShadowDistance = getRdlLight()->get(scene_rdl2::rdl2::Light::sMaxShadowDistanceKey);
+}
+
+void
+Light::updateMinShadowDistance()
+{
+    mMinShadowDistance = getRdlLight()->get(scene_rdl2::rdl2::Light::sMinShadowDistanceKey);
 }
 
 //----------------------------------------------------------------------------

@@ -14,8 +14,7 @@ namespace rt {
 // Note that we can't use any of the CUDA float3 types here because that would
 // pull CUDA headers into large parts of Moonray, and we can't use the regular
 // Moonray math::Vec3 types because that would pull those headers into the GPU
-// code.  So, we are limited to the built-in C++ types.  Luckily we are only
-// passing a small amount of simple data.
+// code.  So, we are limited to the built-in C++ types.
 
 struct GPURay
 {
@@ -29,6 +28,7 @@ struct GPURay
     float mMaxT;
     float mTime;
 #endif
+    int mMask;
     int mShadowReceiverId;
     uint64_t mLightId;
 };
@@ -43,6 +43,12 @@ struct GPURayIsect
     unsigned int mEmbreeGeomID;
     unsigned int mPrimID;
     intptr_t mEmbreeUserData;
+
+    unsigned int mInstance0IdOrLight;
+    unsigned int mInstance1Id;
+    unsigned int mInstance2Id;
+    unsigned int mInstance3Id;
+    float mL2R[4][3]; // layout matches Mat43
 };
 
 } // namespace rt

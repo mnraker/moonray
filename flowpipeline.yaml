@@ -15,11 +15,11 @@ pipeline-configurations:
     test:
       enabled: true
       cmd:
-      - rez-test _packagename_ variant0
+      - rez-test _packagename_ variant8
       - rez-test _packagename_ variant1
-      - rez-test _packagename_ variant2
-      - rez-test _packagename_ variant3
-      - rez-test _packagename_ variant4
+      - rez-test _packagename_ variant9
+      - rez-test _packagename_ variant10
+      - rez-test _packagename_ variant11
       ignore_failures: false
       ignore_failures_email: true
       resource:
@@ -129,12 +129,14 @@ package-configurations:
   rez-2-CI:
     build_context:
     - buildtools
+    - python-3.7
     environment:
       BROKEN_CUSTOM_ARGS_UNITTESTS: 1
       REZ_ALTERNATE_CONFIGURATION: CI
     packages_path:
     - /rel/rez/dwa
     - /rel/rez/third_party
+    - /rel/rez/pypi
     - /rel/lang/python/packages
     release_packages_path: /rel/rez/dwa
     symlink_directory: null
@@ -145,11 +147,13 @@ package-configurations:
   rez-2-RaTS:
     build_context:
     - buildtools
+    - python-3.7
     environment:
       REZ_ALTERNATE_CONFIGURATION: rats
     packages_path:
     - /rel/rez/dwa
     - /rel/rez/third_party
+    - /rel/rez/pypi
     - /rel/lang/python/packages
     release_packages_path: /rel/rez/dwa
     symlink_directory: null
@@ -160,10 +164,12 @@ package-configurations:
   rez-2-testmap:
     build_context:
     - buildtools
+    - python-3.7
     environment: {}
     packages_path:
     - /rel/rez/dwa
     - /rel/rez/third_party
+    - /rel/rez/pypi
     - /rel/lang/python/packages
     release_packages_path: /rel/rez/dwa
     symlink_directory: null

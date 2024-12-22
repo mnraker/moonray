@@ -67,6 +67,7 @@
 
 #include "DistantLight.h"
 
+#include <moonray/rendering/pbr/core/RayState.h>
 #include <moonray/rendering/pbr/light/DistantLight_ispc_stubs.h>
 #include <moonray/rendering/shading/Util.h>
 
@@ -118,8 +119,6 @@ DistantLight::globalToLocalXform(float time, bool needed) const
 DistantLight::DistantLight(const scene_rdl2::rdl2::Light* rdlLight, bool uniformSampling) :
     Light(rdlLight)
 {
-    mIsOpaqueInAlpha = false;
-
     initAttributeKeys(rdlLight->getSceneClass());
 
     ispc::DistantLight_init(this->asIspc(), uniformSampling);
@@ -143,6 +142,7 @@ DistantLight::update(const Mat4d& world2render)
     updatePresenceShadows();
     updateRayTermination();
     updateMaxShadowDistance();
+    updateMinShadowDistance();
 
     const Mat4d l2w0 = mRdlLight->get(scene_rdl2::rdl2::Node::sNodeXformKey, /* rayTime = */ 0.0f);
     const Mat4d l2w1 = mRdlLight->get(scene_rdl2::rdl2::Node::sNodeXformKey, /* rayTime = */ 1.0f);
@@ -210,9 +210,12 @@ DistantLight::update(const Mat4d& world2render)
 
 bool
 DistantLight::canIlluminate(const Vec3f p, const Vec3f *n, float time, float radius,
-    const LightFilterList* lightFilterList) const
+    const LightFilterList* lightFilterList, const PathVertex* pv) const
 {
     MNRY_ASSERT(mOn);
+
+    // Don't illuminate as a regular light if referenced by a portal
+    if (mHasPortal) return false;
 
     if (n && dot(-(*n), getDirection(time)) < mCullThreshold) {
         return false;
@@ -222,7 +225,7 @@ DistantLight::canIlluminate(const Vec3f p, const Vec3f *n, float time, float rad
         return canIlluminateLightFilterList(lightFilterList,
             { getPosition(time),
               math::inf, p, globalToLocalXform(time, lightFilterList->needsLightXform()),
-              radius, time 
+              radius, time, pv
             });
     }
 
@@ -289,22 +292,23 @@ DistantLight::sample(const Vec3f &p, const Vec3f *n, float time, const Vec3f& r,
 
 Color
 DistantLight::eval(mcrt_common::ThreadLocalState* tls, const Vec3f &wi, const Vec3f &p, const LightFilterRandomValues& filterR,
-        float time, const LightIntersection &isect, bool fromCamera, const LightFilterList *lightFilterList,
-        float rayDirFootprint, float *pdf) const
+        float time, const LightIntersection &isect, bool fromCamera, const LightFilterList *lightFilterList, const PathVertex *pv,
+        float rayDirFootprint, float *visibility, float *pdf) const
 {
     MNRY_ASSERT(mOn);
 
     Color radiance = mRadiance;
 
     if (lightFilterList) {
-        evalLightFilterList(lightFilterList, 
+        evalLightFilterList(lightFilterList,
                             { tls, &isect, getPosition(time),
                               getDirection(time), p,
-                              filterR, time,
+                              filterR, time, pv,
                               globalToLocalXform(time, lightFilterList->needsLightXform()),
                               wi
                             },
-                            radiance);
+                            radiance,
+                            visibility);
         }
 
     if (pdf) {

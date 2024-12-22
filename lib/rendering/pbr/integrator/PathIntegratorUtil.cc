@@ -253,7 +253,7 @@ drawBsdfSamples(pbr::TLState *pbrTls, const BsdfSampler &bSampler, const LightSe
                                                 != 0;
 
         // lobeMask is used for comparison against a light's visibility flags.
-        // This comparison is made in the LightSampler's intersectAndEval() function inside the loop below.
+        // This comparison is made in the LightSet's intersectAndEval() function inside the loop below.
         int lobeMask = lobeTypeToRayMask(lobeType);
 
         // Loop over each lobe's samples
@@ -263,13 +263,13 @@ drawBsdfSamples(pbr::TLState *pbrTls, const BsdfSampler &bSampler, const LightSe
             float bsdfSample[2];
             bsdfSamples.getSample(bsdfSample, pv.nonMirrorDepth);
 
-            // Initialize to some value so you don't get NaNs if 
+            // Initialize to some value so you don't get NaNs if
             // lightFilterNeedsSamples is false (see MOONRAY-4649)
             LightFilterRandomValues lightFilterSample = {
-                            scene_rdl2::math::Vec2f(0.f, 0.f), 
+                            scene_rdl2::math::Vec2f(0.f, 0.f),
                             scene_rdl2::math::Vec3f(0.f, 0.f, 0.f)};
             if (lightFilterNeedsSamples) {
-                lightFilterSamples.getSample(&lightFilterSample.r2[0], pv.nonMirrorDepth);            
+                lightFilterSamples.getSample(&lightFilterSample.r2[0], pv.nonMirrorDepth);
                 lightFilterSamples3D.getSample(&lightFilterSample.r3[0], pv.nonMirrorDepth);
             }
 
@@ -295,10 +295,13 @@ drawBsdfSamples(pbr::TLState *pbrTls, const BsdfSampler &bSampler, const LightSe
             // direction, and return the distance to the chosen light if
             // there is. The distance is set to infinity if there is no light or
             // to sInfiniteLightDistance if there is an InfiniteAreaLight.
-            lSampler.intersectAndEval(pbrTls->mTopLevelTls, P, N, bsmp[s].wi, lightFilterSample, time, false, includeRayTerminationLights,
-                                      lightChoiceSamples, pv.nonMirrorDepth, lobeMask, lCo, rayDirFootprint);
+            const LightSet &lightSet = lSampler.getLightSet();
+            lightSet.intersectAndEval(pbrTls->mTopLevelTls, P, N, bsmp[s].wi, lightFilterSample, time, &pv, false,
+                                      includeRayTerminationLights, lightChoiceSamples, pv.nonMirrorDepth, lobeMask,
+                                      lCo, rayDirFootprint);
 
             integrateBsdfSample(bSampler, lobeIndex, lSampler, pv.pathThroughput, lCo, bsmp[s]);
+
             // save the light, we'll need it (for its labels) when processing lpes
             bsmp[s].lp.light = lCo.isInvalid ? nullptr : lCo.light;
 
@@ -528,20 +531,18 @@ drawLightSamples(pbr::TLState *pbrTls, const LightSetSampler &lSampler, const Bs
         // Draw the sample and test validity
         scene_rdl2::math::Vec3f lightSample;
         lightSamples.getSample(&lightSample[0], pv.nonMirrorDepth);
-            
-        // Initialize to some value so you don't get NaNs if 
+
+        // Initialize to some value so you don't get NaNs if
         // lightFilterNeedsSamples is false
         LightFilterRandomValues lightFilterSample = {
-                        scene_rdl2::math::Vec2f(0.f, 0.f), 
+                        scene_rdl2::math::Vec2f(0.f, 0.f),
                         scene_rdl2::math::Vec3f(0.f, 0.f, 0.f)};
         if (lightFilterNeedsSamples) {
             lightFilterSamples.getSample(&lightFilterSample.r2[0], pv.nonMirrorDepth);
             lightFilterSamples3D.getSample(&lightFilterSample.r3[0], pv.nonMirrorDepth);
         }
-        lSampler.sampleIntersectAndEval(pbrTls->mTopLevelTls,
-                                        light, lightFilterList,
-                                        P, N, lightFilterSample, time, lightSample,
-                                        lsmp[i], rayDirFootprint);
+        lSampler.sampleAndEval(pbrTls->mTopLevelTls, light, lightFilterList, P, N, lightFilterSample,
+                               time, &pv, lightSample, lsmp[i], rayDirFootprint);
 
         if (lsmp[i].isInvalid()) {
             // These samples occur on the shadow terminator -- they are invalid because they face
@@ -638,8 +639,10 @@ void
 accumulateRayPresence(pbr::TLState *pbrTls,
                       const Light* light,
                       const mcrt_common::Ray& shadowRay,
-                      float rayEpsilon,
-                      int maxDepth,
+                      const float rayEpsilon,
+                      const int maxDepth,
+                      const unsigned pixel, const int subpixelIndex, const unsigned sequenceID,
+                      const bool allowStochasticPresence,
                       float& totalPresence)
 {
     // Used for presence shadows in scalar and vectorized mode.
@@ -676,7 +679,25 @@ accumulateRayPresence(pbr::TLState *pbrTls,
             const scene_rdl2::rdl2::Material* material = isect.getMaterial()->asA<scene_rdl2::rdl2::Material>();
             MNRY_ASSERT(material != nullptr);
             float presence = shading::presence(material, shadingTls, shading::State(&isect));
-            totalPresence += (1.0f - totalPresence) * presence;
+
+            if (allowStochasticPresence) {
+                SequenceIDIntegrator sid( pixel,
+                                          subpixelIndex,
+                                          SequenceType::PresenceShadows,
+                                          sequenceID,
+                                          currentShadowRay.getDepth() );
+                IntegratorSample1D prSamples(sid);
+                float prSample;
+
+                prSamples.getSample(&prSample, currentShadowRay.getDepth());
+                if (prSample < presence) {
+                    // this presence is considered one and therefore totalPresence is also one
+                    totalPresence = 1.0f;
+                    return;
+                } // else this presence is considered zero therefore totalPresence is unchanged
+            } else {
+                totalPresence += (1.0f - totalPresence) * presence;
+            }
         }
 
         if (currentShadowRay.getDepth() < maxDepth && totalPresence < pbrTls->mFs->mPresenceThreshold) {

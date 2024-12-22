@@ -13,6 +13,8 @@
 namespace moonray {
 namespace rt {
 
+#define MAX_MOTION_BLUR_SAMPLES 16
+
 // The host-side representation of the geometric primitives in the scene.
 // Typically this is a few parameters and a set of buffers that live on the
 // GPU (as it is up to the host to manage the GPU memory.)
@@ -26,7 +28,7 @@ public:
     unsigned int mInputFlags;
     bool mIsSingleSided;
     bool mIsNormalReversed;
-    bool mVisibleShadow;
+    int mMask;
     intptr_t mEmbreeUserData;
     unsigned int mEmbreeGeomID;
 
@@ -44,17 +46,16 @@ public:
 class OptixGPUTriMesh : public OptixGPUPrimitive
 {
 public:
-    OptixGPUBuffer<float3>       mVertices;
-    // We need to keep a pointer to each motion sample's vertex buffer. If there is no motion blur, both pointers
-    // will point to the same buffer.
-    std::array<CUdeviceptr, 2>   mVerticesPtrs;
+    OptixGPUBuffer<float3>       mVertices[MAX_MOTION_BLUR_SAMPLES];
+    // We need to keep a pointer to each motion sample's vertex buffer.
+    CUdeviceptr                  mVerticesPtrs[MAX_MOTION_BLUR_SAMPLES];
     size_t                       mNumVertices;
 
     bool                         mWasQuads; // If this mesh was actually quads that have been converted to tris
     OptixGPUBuffer<unsigned int> mIndices;
     size_t                       mNumFaces;
 
-    bool                         mEnableMotionBlur;
+    unsigned int                 mNumMotionBlurSamples;
 };
 
 // Linear or BSpline round curves.  This is supported as a built-in type by Optix 7.1,
@@ -68,6 +69,7 @@ public:
     int mMotionSamplesCount; // 1 or 2 - a current limitation of RoundCurves
 
     // each index points to the first control point in a curve segment
+    int mNumIndices;
     OptixGPUBuffer<unsigned int> mIndices;
 
     int mNumControlPoints;
@@ -119,11 +121,13 @@ public:
     void freeHostMemory() override;
 
     unsigned int mSegmentsPerCurve;
-    unsigned int mBasis;  // BEZIER, BSPLINE, LINEAR
+    unsigned int mBasis;   // BEZIER, BSPLINE, LINEAR
+    unsigned int mSubType; // RAY_FACING or ROUND; NORMAL_ORIENTED is not yet supported
 
     // Number of motion samples for motion blur.  1 = no motion blur.
     int mMotionSamplesCount;
 
+    int mNumIndices;
     // Host-side copy of the curve indices
     std::vector<unsigned int> mHostIndices;
 

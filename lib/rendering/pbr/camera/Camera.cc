@@ -131,6 +131,12 @@ Camera::computeFrustumImpl(mcrt_common::Frustum *frust, float t, bool useRenderR
 }
 
 void
+Camera::computeFishtumImpl(mcrt_common::Fishtum *fish, float t, bool useRenderRegion) const
+{
+    throw scene_rdl2::except::NotImplementedError("No fishtum implemented for this camera type.");
+}
+
+void
 Camera::bakeUvMapsImpl()
 {
     // empty
@@ -150,20 +156,20 @@ Camera::getMotionBlur() const
 }
 
 float
-Camera::computeZDistance(const Vec3f &p, const Vec3f &o, float time) const
+Camera::computeZDistance(const Vec3f &p, float tHit, float time) const
 {
-    return computeZDistanceImpl(p, o, time);
+    return computeZDistanceImpl(p, tHit, time);
 }
 
 float
-Camera::computeZDistanceImpl(const Vec3f &p, const Vec3f &o, float time) const
+Camera::computeZDistanceImpl(const Vec3f &p, float tHit, float time) const
 {
-    // The default implemenation computes the euclidean distance between
-    // the ray hit point p, and the ray origin o.  This should be a good
-    // default for all but projective cameras.  It assumes that the camera
-    // space has no scales, which ensures that distance in render space is equal
-    // to distance in all camera spaces.  So the time parameter is ignored.
-    return (p - o).length();
+    // This function can be overridden, as it is for ProjectiveCamera, but the
+    // default implementation simply returns the ray t value of the intersection point.
+    // It assumes that the camera space has no scales, which ensures that distance in
+    // render space is equal to distance in all camera spaces. So the time parameter
+    // is ignored.
+    return tHit;
 }
 
 } // namespace pbr

@@ -196,7 +196,7 @@ PathIntegrator::computeRadianceSubsurfaceSample(pbr::TLState *pbrTls,
             // Evaluate the light sample and pdf
             float lightPdf;
             scene_rdl2::math::Color Li = light->eval(pbrTls->mTopLevelTls, wi, P, lightFilterSample,
-                parentRay.getTime(), lightIsect, false, lightFilterList, parentRay.getDirFootprint(), &lightPdf);
+                parentRay.getTime(), lightIsect, false, lightFilterList, &pv, parentRay.getDirFootprint(), nullptr, &lightPdf);
 
             if (isSampleInvalid(Li, lightPdf)) {
                 continue;
@@ -229,7 +229,7 @@ PathIntegrator::computeRadianceSubsurfaceSample(pbr::TLState *pbrTls,
             Ray shadowRay(P, wi, rayEpsilon, tfar, time, rayDepth);
             float presence = 0.0f;
             int32_t assignmentId = isect.getLayerAssignmentId();
-            if (isRayOccluded(pbrTls, light, shadowRay, rayEpsilon, shadowRayEpsilon, presence, assignmentId)) {
+            if (isRayOccluded(pbrTls, light, shadowRay, rayEpsilon, shadowRayEpsilon, sp, sequenceID, pt, presence, assignmentId)) {
                 // LPE
                 if (aovs) {
                     EXCL_ACCUMULATOR_PROFILE(pbrTls, EXCL_ACCUM_AOVS);
@@ -419,7 +419,7 @@ PathIntegrator::computeRadianceSubsurfaceSample(pbr::TLState *pbrTls,
             // We multiply by numLightsHit because we're stochastically sampling
             // just one, thus computing an average
             Li = hitLight->eval(pbrTls->mTopLevelTls, wi, P, bsdfLightFilterSample,
-                parentRay.getTime(), lightIsect, false, hitLightFilterList, parentRay.getDirFootprint(), &lightPdf) *
+                parentRay.getTime(), lightIsect, false, hitLightFilterList, &pv, parentRay.getDirFootprint(), nullptr, &lightPdf) *
                 (float)numLightsHit;
             if (isSampleInvalid(Li, lightPdf)) {
                 doDirect = false;
@@ -461,12 +461,12 @@ PathIntegrator::computeRadianceSubsurfaceSample(pbr::TLState *pbrTls,
             scene_rdl2::math::Color contribution;
             float transparency;
             ++sequenceID;
-            bool hitVolume;
+            bool hitVolume = false;
 
             IndirectRadianceType indirectRadianceType = computeRadianceRecurse(
                     pbrTls, ray, sp, nextPv, &lobe,
                     contribution, transparency, vt,
-                    sequenceID, aovs, nullptr, nullptr, nullptr, nullptr, false, hitVolume);
+                    sequenceID, aovs, nullptr, nullptr, nullptr, nullptr, nullptr, false, hitVolume);
             if (indirectRadianceType != NONE) {
                 // Accumulate radiance, but only accumulate indirect or direct
                 // contribution
@@ -483,7 +483,7 @@ PathIntegrator::computeRadianceSubsurfaceSample(pbr::TLState *pbrTls,
             Ray shadowRay(P, wi, rayEpsilon, tfar, time, rayDepth);
             const bool hasUnoccludedFlag = fs.mAovSchema->hasLpePrefixFlags(AovSchema::sLpePrefixUnoccluded);
             int32_t assignmentId = isect.getLayerAssignmentId();
-            if (isRayOccluded(pbrTls, hitLight, shadowRay, rayEpsilon, shadowRayEpsilon, presence, assignmentId)) {
+            if (isRayOccluded(pbrTls, hitLight, shadowRay, rayEpsilon, shadowRayEpsilon, sp, sequenceID, pt, presence, assignmentId)) {
                 // LPE
                 if (aovs) {
                     EXCL_ACCUMULATOR_PROFILE(pbrTls, EXCL_ACCUM_AOVS);

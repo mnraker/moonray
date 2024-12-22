@@ -3,12 +3,12 @@
 
 
 #include "SpotLight.h"
-#include <moonray/rendering/pbr/core/Util.h>
-
+#include <moonray/common/mcrt_macros/moonray_static_check.h>
 #include <moonray/rendering/pbr/core/Distribution.h>
+#include <moonray/rendering/pbr/core/RayState.h>
+#include <moonray/rendering/pbr/core/Util.h>
 #include <moonray/rendering/pbr/light/SpotLight_ispc_stubs.h>
 
-#include <moonray/common/mcrt_macros/moonray_static_check.h>
 #include <scene_rdl2/scene/rdl2/rdl2.h>
 
 
@@ -21,7 +21,7 @@ using namespace scene_rdl2::math;
 using scene_rdl2::logging::Logger;
 
 
-bool                             SpotLight::sAttributeKeyInitialized;
+bool                                                     SpotLight::sAttributeKeyInitialized;
 scene_rdl2::rdl2::AttributeKey<scene_rdl2::rdl2::Bool>   SpotLight::sNormalizedKey;
 scene_rdl2::rdl2::AttributeKey<scene_rdl2::rdl2::Bool>   SpotLight::sApplySceneScaleKey;
 scene_rdl2::rdl2::AttributeKey<scene_rdl2::rdl2::Float>  SpotLight::sLensRadiusKey;
@@ -75,6 +75,7 @@ SpotLight::update(const Mat4d &world2render)
     updateRayTermination();
     updateTextureFilter();
     updateMaxShadowDistance();
+    updateMinShadowDistance();
     UPDATE_ATTRS_CLEAR_RADIUS
 
     const Mat4d l2w0 = mRdlLight->get(scene_rdl2::rdl2::Node::sNodeXformKey, /* rayTime = */ 0.f);
@@ -169,7 +170,7 @@ SpotLight::update(const Mat4d &world2render)
 
 bool
 SpotLight::canIlluminate(const Vec3f p, const Vec3f *n, float time, float radius,
-    const LightFilterList* lightFilterList) const
+    const LightFilterList* lightFilterList, const PathVertex* pv) const
 {
     MNRY_ASSERT(mOn);
 
@@ -207,7 +208,7 @@ SpotLight::canIlluminate(const Vec3f p, const Vec3f *n, float time, float radius
             { getPosition(time),
               xformLocal2RenderScale(math::max(mLensRadius, mLensRadiusY), time),
               p, getXformRender2Local(time, lightFilterList->needsLightXform()),
-              radius, time
+              radius, time, pv
             });
     }
 
@@ -479,8 +480,9 @@ SpotLight::sample(const Vec3f &p, const Vec3f *n, float time, const Vec3f& r,
 
 
 Color
-SpotLight::eval(mcrt_common::ThreadLocalState* tls, const Vec3f &wi, const Vec3f &p, const LightFilterRandomValues& filterR, float time,
-        const LightIntersection &isect, bool fromCamera, const LightFilterList *lightFilterList, float rayDirFootprint,
+SpotLight::eval(mcrt_common::ThreadLocalState* tls, const Vec3f &wi, const Vec3f &p, 
+        const LightFilterRandomValues& filterR, float time, const LightIntersection &isect, bool fromCamera, 
+        const LightFilterList *lightFilterList, const PathVertex *pv, float rayDirFootprint, float *visibility, 
         float *pdf) const
 {
     MNRY_ASSERT(mOn);
@@ -507,11 +509,12 @@ SpotLight::eval(mcrt_common::ThreadLocalState* tls, const Vec3f &wi, const Vec3f
         evalLightFilterList(lightFilterList,
                             { tls, &isect, getPosition(time),
                               getDirection(time), p,
-                              filterR, time,
+                              filterR, time, pv,
                               getXformRender2Local(time, lightFilterList->needsLightXform()),
                               wi
                             },
-                            radiance);
+                            radiance,
+                            visibility);
     }
 
     if (pdf) {

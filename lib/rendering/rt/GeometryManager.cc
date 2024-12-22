@@ -654,8 +654,7 @@ GeometryManager::loadGeometries(scene_rdl2::rdl2::Layer* layer,
                                                  scene_rdl2::rdl2::TIMESTEP_END) * world2render);
                 }
 
-                if (scene_rdl2::math::isEqual(l2r0, l2r1) ||
-                    !motionBlurParams.isMotionBlurOn()) {
+                if (scene_rdl2::math::isEqual(l2r0, l2r1)) {
                     geometry2render = {xform<Xform3f>(l2r0)};
                 } else {
                     geometry2render = {xform<Xform3f>(l2r0), xform<Xform3f>(l2r1)};
@@ -905,6 +904,7 @@ void
 GeometryManager::bakeGeometry(scene_rdl2::rdl2::Layer* layer,
         const geom::MotionBlurParams& motionBlurParams,
         const std::vector<mcrt_common::Frustum>& frustums,
+        const std::vector<mcrt_common::Fishtum>& fishtums,
         const scene_rdl2::math::Mat4d& world2render,
         std::vector<std::unique_ptr<geom::BakedMesh>>& bakedMeshes,
         std::vector<std::unique_ptr<geom::BakedCurves>>& bakedCurves,
@@ -960,6 +960,7 @@ GeometryManager::bakeGeometry(scene_rdl2::rdl2::Layer* layer,
 
                 const geom::internal::TessellationParams params(layer,
                                                                 dicingCamExists ? dicingFrustums : frustums,
+                                                                fishtums,
                                                                 dicingCamExists ? dicingWorld2Render : world2render,
                                                                 enableDisplacement,
                                                                 fastGeomUpdate,
@@ -1024,6 +1025,7 @@ GeometryManager::GM_RESULT
 GeometryManager::finalizeChanges(scene_rdl2::rdl2::Layer* layer,
         const geom::MotionBlurParams& motionBlurParams,
         const std::vector<mcrt_common::Frustum>& frustums,
+        const std::vector<mcrt_common::Fishtum>& fishtums,
         const scene_rdl2::math::Mat4d& world2render,
         OptimizationTarget accelMode, 
         const scene_rdl2::rdl2::Camera* dicingCamera,
@@ -1094,8 +1096,8 @@ GeometryManager::finalizeChanges(scene_rdl2::rdl2::Layer* layer,
         }
 
         // (re)tessellate the primitives
-        if (tessellate(layer, primitivesToTessellate, frustums, world2render, motionBlurParams, dicingCamera) ==
-            GM_RESULT::CANCELED) {
+        if (tessellate(layer, primitivesToTessellate, frustums, fishtums, world2render, motionBlurParams,
+                       dicingCamera) == GM_RESULT::CANCELED) {
             return GM_RESULT::CANCELED;
         }
 
@@ -1112,6 +1114,10 @@ GeometryManager::finalizeChanges(scene_rdl2::rdl2::Layer* layer,
         }
 
         if (updateSceneBVH) {
+            if (mChangeStatus == ChangeFlag::UPDATE && layer->getChangedOrDeformedGeometries().empty()) {
+                mOptions.stats.logString("Scene updated but no need to build BVH, skipping...");
+                return GM_RESULT::FINISHED;
+            }
             if (mOptions.stats.mGeometryManagerExecTracker.startBVHConstruction() ==
                 GeometryManagerExecTracker::RESULT::CANCELED) {
                 return GM_RESULT::CANCELED;
@@ -1391,6 +1397,7 @@ GeometryManager::GM_RESULT
 GeometryManager::tessellate(scene_rdl2::rdl2::Layer* layer,
         geom::InternalPrimitiveList& primitivesToTessellate,
         const std::vector<mcrt_common::Frustum>& frustums,
+        const std::vector<mcrt_common::Fishtum>& fishtums,
         const scene_rdl2::math::Mat4d& world2render,
         const geom::MotionBlurParams& motionBlurParams,
         const scene_rdl2::rdl2::Camera* globalDicingCamera)
@@ -1476,6 +1483,7 @@ GeometryManager::tessellate(scene_rdl2::rdl2::Layer* layer,
 
                 const geom::internal::TessellationParams tessParams(layer,
                                                                     dicingCamExists ? dicingFrustums : frustums,
+                                                                    fishtums,
                                                                     dicingCamExists ? dicingWorld2Render : world2render,
                                                                     enableDisplacement,
                                                                     fastGeomUpdate,

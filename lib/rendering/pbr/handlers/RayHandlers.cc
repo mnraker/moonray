@@ -98,7 +98,7 @@ areSingleRaysOccluded(pbr::TLState *pbrTls, unsigned numEntries, BundledOcclRay 
                 const int numItems = pbrTls->getNumListItems(occlRay.mDataPtrHandle);
                 accumLightAovs(pbrTls, occlRay, fs, numItems, scene_rdl2::math::sWhite, &tr,
                                AovSchema::sLpePrefixUnoccluded);
-                accumVisibilityAovs(pbrTls, occlRay, fs, numItems, reduceTransparency(tr));
+                accumVisibilityAovs(pbrTls, occlRay, fs, numItems, reduceTransparency(tr) * occlRay.mLsmpVisibility);
             }
         } else {
             // LPE: visibility aovs when we don't hit light
@@ -245,11 +245,14 @@ computePresenceShadowsQueriesBundled(pbr::TLState *pbrTls, unsigned int numEntri
             occlRay.mMinT, occlRay.mMaxT, occlRay.mTime, occlRay.mDepth);
 
         float presence = 0.0f;
+        const bool allowStochasticPresence = (b->mFlags & BundledOcclRayDataFlags::STOCHASTIC_PRESENCE);
         accumulateRayPresence(pbrTls,
                               b->mLight,
                               shadowRay,
                               b->mRayEpsilon,
                               fs.mMaxPresenceDepth,
+                              occlRay.mPixel, occlRay.mSubpixelIndex, occlRay.mSequenceID,
+                              allowStochasticPresence,
                               presence);
 
         // At this point, we know that the ray is not occluded, but we still need to
@@ -282,7 +285,8 @@ computePresenceShadowsQueriesBundled(pbr::TLState *pbrTls, unsigned int numEntri
             accumLightAovs(pbrTls, occlRay, fs, numItems, scene_rdl2::math::sWhite, &occlusionValue,
                            AovSchema::sLpePrefixUnoccluded);
 
-            accumVisibilityAovs(pbrTls, occlRay, fs, numItems, reduceTransparency(occlusionValue));
+            accumVisibilityAovs(pbrTls, occlRay, fs, numItems, 
+                                reduceTransparency(occlusionValue) * occlRay.mLsmpVisibility);
         }
 
         // we are responsible for freeing data memory
@@ -548,18 +552,13 @@ rayBundleHandler(mcrt_common::ThreadLocalState *tls, unsigned numEntries,
                             scene_rdl2::math::Vec3f(0.f, 0.f, 0.f)}; // light filters don't apply to camera rays
                         radiance = rs->mPathVertex.pathThroughput *
                             hitLight->eval(tls, rs->mRay.getDirection(), rs->mRay.getOrigin(),
-                                           lightFilterR, rs->mRay.getTime(), hitLightIsect, true, nullptr,
-                                           rs->mRay.getDirFootprint()) * numHits;
+                                           lightFilterR, rs->mRay.getTime(), hitLightIsect, true, nullptr, nullptr,
+                                           rs->mRay.getDirFootprint(), nullptr, nullptr) * numHits;
                         // attenuate based on volume transmittance
                         if (rs->mVolHit) radiance *= (rs->mVolTr * rs->mVolTh);
 
-                        // alpha depends on light opacity and volumes
-                        if (hitLight->getIsOpaqueInAlpha()) {
-                            // We hit a visible light that is opaque in alpha.
-                            // Volumes are irrelevant, the alpha contribution is
-                            // the full pixel weight.
-                            alpha = rs->mPathVertex.pathPixelWeight;
-                        } else if (rs->mVolHit) {
+                        // alpha depends on volumes
+                        if (rs->mVolHit) {
                             // We hit a visible light, but the light is not
                             // opaque in alpha (e.g. a distant or env light).
                             // There is a volume along this ray.  The volume

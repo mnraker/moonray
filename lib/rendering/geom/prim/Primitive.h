@@ -45,6 +45,7 @@ class Camera;
 namespace mcrt_common {
 class ThreadLocalState;
 struct Frustum;
+struct Fishtum;
 }
 
 namespace geom {
@@ -60,12 +61,13 @@ class VolumeSampleInfo;
 struct TessellationParams {
     TessellationParams(const scene_rdl2::rdl2::Layer *rdlLayer,
         const std::vector<mcrt_common::Frustum>& frustums,
+        const std::vector<mcrt_common::Fishtum>& fishtums,
         const scene_rdl2::math::Mat4d& world2render,
         bool enableDisplacement,
         bool fastGeomUpdate,
         bool isBaking,
         const VolumeAssignmentTable* volumeAssignmentTable) :
-            mRdlLayer(rdlLayer), mFrustums(frustums),
+            mRdlLayer(rdlLayer), mFrustums(frustums), mFishtums(fishtums),
             mWorld2Render(world2render),
             mEnableDisplacement(enableDisplacement),
             mFastGeomUpdate(fastGeomUpdate),
@@ -74,6 +76,7 @@ struct TessellationParams {
 
     const scene_rdl2::rdl2::Layer *mRdlLayer;
     const std::vector<mcrt_common::Frustum>& mFrustums;
+    const std::vector<mcrt_common::Fishtum>& mFishtums;
     const scene_rdl2::math::Mat4d& mWorld2Render;
     bool mEnableDisplacement;
     bool mFastGeomUpdate;

@@ -22,7 +22,7 @@ LightSet_hudValidation(uniform bool verbose)
 varying int
 LightSet_intersect(uniform PbrTLState * uniform pbrTls, const uniform LightSet * uniform lightSet,
                    const varying Vec3f &P, const varying Vec3f &cullingNormal, const varying Vec3f &wi,
-                   varying float time, varying float maxDistance, uniform bool fromCamera,
+                   varying float time, varying float maxDistance,
                    varying bool includeRayTerminationLights, varying IntegratorSample1D &samples, varying int depth,
                    varying int visibilityMask, varying LightIntersection &chosenIsect, varying int &numHits)
 {
@@ -57,6 +57,11 @@ LightSet_intersect(uniform PbrTLState * uniform pbrTls, const uniform LightSet *
             continue;
         }
 
+        if (Light_hasPortal(light)) {
+            // skip light if it has a portal assigned
+            continue;
+        }
+
         if (Light_intersect(light, P, cullingNormal, wi, time, maxDistance, currentIsect)) {
             numHits++;
 
@@ -78,10 +83,11 @@ LightSet_intersectAndEval(uniform PbrTLState * uniform pbrTls,
                           const uniform LightSet * uniform lightSet,
                           uniform ShadingTLState * uniform tls,
                           const varying Vec3f &P, const varying Vec3f &cullingNormal, const varying Vec3f &wi,
-                          const varying LightFilterRandomValues &filterR, varying float time, uniform bool fromCamera,
-                          varying bool includeRayTerminationLights, varying IntegratorSample1D &samples,
-                          varying int depth, varying int visibilityMask, varying LightContribution &lCo,
-                          varying float rayDirFootprint)
+                          const varying LightFilterRandomValues &filterR, varying float time,
+                          const varying PathVertex * uniform pv,
+                          uniform bool fromCamera, varying bool includeRayTerminationLights,
+                          varying IntegratorSample1D &samples, varying int depth,
+                          varying int visibilityMask, varying LightContribution &lCo, varying float rayDirFootprint)
 {
     // Initialize contribution
     lCo.isInvalid = true;
@@ -93,7 +99,7 @@ LightSet_intersectAndEval(uniform PbrTLState * uniform pbrTls,
     // Compute intersection with a random light
     varying LightIntersection isect;
     varying int numLightsHit = 0;
-    varying int lightIdx = LightSet_intersect(pbrTls, lightSet, P, cullingNormal, wi, time, sMaxValue, fromCamera,
+    varying int lightIdx = LightSet_intersect(pbrTls, lightSet, P, cullingNormal, wi, time, sMaxValue,
         includeRayTerminationLights, samples, depth, visibilityMask, isect, numLightsHit);
 
     const uniform Light * varying light = nullptr;
@@ -113,8 +119,8 @@ LightSet_intersectAndEval(uniform PbrTLState * uniform pbrTls,
     lCo.distance = isect.distance;
 
     // Evaluate the intersected light Li and pdf
-    lCo.Li = Light_eval(light, tls, wi, P, filterR, time, isect, fromCamera, lightFilterList, rayDirFootprint,
-                        &lCo.pdf);
+    lCo.Li = Light_eval(light, tls, wi, P, filterR, time, isect, fromCamera, lightFilterList, pv, rayDirFootprint,
+                        nullptr, &lCo.pdf);
     lCo.isInvalid = isSampleInvalid(lCo.Li, lCo.pdf);
 
     // Radiance has to be scaled by number of lights hit because we're only sampling one

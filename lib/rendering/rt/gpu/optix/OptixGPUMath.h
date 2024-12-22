@@ -73,6 +73,14 @@ float lerpf(const float v1, const float v2, const float t)
 }
 
 inline __host__ __device__
+float3 lerp(const float3& v1, const float3& v2, const float t)
+{
+    return {(1.f - t) * v1.x + t * v2.x,
+            (1.f - t) * v1.y + t * v2.y,
+            (1.f - t) * v1.z + t * v2.z};
+}
+
+inline __host__ __device__
 float4 lerp(const float4& v1, const float4& v2, const float t)
 {
     return {(1.f - t) * v1.x + t * v2.x,
@@ -87,6 +95,32 @@ void swapf(float& a, float& b)
     float tmp = a;
     a = b;
     b = tmp;
+}
+
+// float2 operators and functions
+
+inline __device__
+float2 operator+(const float2& a, const float2& b)
+{
+    return {a.x + b.x, a.y + b.y};
+}
+
+inline __host__ __device__
+float2 operator-(const float2& a, const float2& b)
+{
+    return {a.x - b.x, a.y - b.y};
+}
+
+inline __device__
+float2 operator*(const float a, const float2& b)
+{
+    return {a * b.x, a * b.y};
+}
+
+inline __device__
+float2 operator/(const float2& a, const float b)
+{
+    return {a.x/b, a.y/b};
 }
 
 // float3 operators and functions
@@ -153,6 +187,12 @@ float3 cross(const float3& a, const float3& b)
             a.x * b.y - a.y * b.x};
 }
 
+inline __device__
+float3 abs(const float3& a)
+{
+    return {fabsf(a.x), fabsf(a.y), fabsf(a.z)};
+}
+
 inline __host__ __device__
 float length(const float3& v)
 {
@@ -187,7 +227,55 @@ float maxAbsComponent(const float3& v)
     return fmaxf(fabsf(v.x), fabsf(v.y), fabsf(v.z));
 }
 
+inline __device__
+float3 min(const float3& a, const float3& b)
+{
+    return {fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z)};
+}
+
+inline __device__
+float3 max(const float3& a, const float3& b)
+{
+    return {fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z)};
+}
+
+inline __device__
+float sqr(const float3& a)
+{
+    return dot(a, a);
+}
+
 // float4 operators and functions
+
+inline __host__ __device__
+float4 make_float4_zero()
+{
+    return {0.f, 0.f, 0.f, 0.f};
+}
+
+inline __host__ __device__
+float3 make_float3(const float4& v)
+{
+    return {v.x, v.y, v.z};
+}
+
+inline __host__ __device__
+float4 make_float4(const float3& v)
+{
+    return {v.x, v.y, v.z, 0.f};
+}
+
+inline __host__ __device__
+float4 make_float4(const float3& v, const float a)
+{
+    return {v.x, v.y, v.z, a};
+}
+
+inline __host__ __device__
+float4 make_float4(const float4& v, const float a)
+{
+    return {v.x, v.y, v.z, a};
+}
 
 inline __host__ __device__
 float4 operator+(const float4& a, const float4& b)
@@ -219,16 +307,69 @@ float4 operator*(const float a, const float4& v)
     return {v.x * a, v.y * a, v.z * a, v.w * a};
 }
 
-inline __host__ __device__
-float3 make_float3(const float4& v)
+inline __device__
+float4 abs(const float4& a)
 {
-    return {v.x, v.y, v.z};
+    return {fabsf(a.x), fabsf(a.y), fabsf(a.z), fabsf(a.w)};
 }
 
 inline __host__ __device__
-float4 make_float4(const float3& v, const float a)
+float4 cross(const float4& a, const float4& b)
 {
-    return {v.x, v.y, v.z, a};
+    float3 cr = cross(make_float3(a), make_float3(b));
+    return {cr.x, cr.y, cr.z, 0.f};
+}
+
+inline __device__
+float dot3(const float4& a, const float4& b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+inline __device__
+float length3(const float4& a)
+{
+    return sqrtf(dot3(a,a));
+}
+
+inline __device__
+float4 min(const float4& a, const float4& b)
+{
+    return {fminf(a.x, b.x), fminf(a.y, b.y), fminf(a.z, b.z), fminf(a.w, b.w)};
+}
+
+inline __device__
+float4 max(const float4& a, const float4& b)
+{
+    return {fmaxf(a.x, b.x), fmaxf(a.y, b.y), fmaxf(a.z, b.z), fmaxf(a.w, b.w)};
+}
+
+inline __device__
+float4 max(const float4& a, const float4& b, const float4& c)
+{
+    return max(a, max(b, c));
+}
+
+inline __device__
+float reduce_max3(const float4& a)
+{
+    return fmaxf(a.x, a.y, a.z);
+}
+
+inline __device__
+float4 remove_w(const float4& a)
+{
+    return {a.x, a.y, a.z, 0.f};
+}
+
+// Point/line functions
+
+inline __device__
+float sqr_point_to_line_distance(const float3& PmQ0, const float3& Q1mQ0)
+{
+    const float3 N = cross(PmQ0,Q1mQ0);
+    const float3 D = Q1mQ0;
+    return dot(N,N) / dot(D,D);
 }
 
 // OptixAabb functions
@@ -268,6 +409,14 @@ enum CurveType
     BEZIER,
     BSPLINE,
     LINEAR
+};
+
+enum CurveSubType
+{
+    RAY_FACING,
+    ROUND,
+    NORMAL_ORIENTED,
+    UNKNOWN
 };
 
 // https://en.wikipedia.org/wiki/B%C3%A9zier_curve

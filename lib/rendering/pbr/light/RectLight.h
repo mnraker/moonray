@@ -24,6 +24,8 @@ namespace rdl2 {
 namespace moonray {
 namespace pbr {
 
+class PathVertex;
+
 //----------------------------------------------------------------------------
 
 /// @brief Implements light sampling for rectangular lights.
@@ -37,6 +39,7 @@ namespace pbr {
 class RectLight : public LocalParamLight
 {
     friend class RectLightTester;
+    friend class PortalLight;
 
 public:
     /// Constructor / Destructor
@@ -53,8 +56,10 @@ public:
     virtual bool update(const scene_rdl2::math::Mat4d& world2render) override;
 
     /// Intersection and sampling API
+    bool canIlluminateHelper(const scene_rdl2::math::Vec3f p, const scene_rdl2::math::Vec3f *n, float time, float radius,
+            const LightFilterList* lightFilterList, const PathVertex* pv) const;
     virtual bool canIlluminate(const scene_rdl2::math::Vec3f p, const scene_rdl2::math::Vec3f *n, float time, float radius,
-            const LightFilterList* lightFilterList) const override;
+            const LightFilterList* lightFilterList, const PathVertex* pv) const override;
     virtual bool isBounded() const override;
     virtual bool isDistant() const override;
     virtual bool isEnv() const override;
@@ -63,9 +68,10 @@ public:
             float maxDistance, LightIntersection &isect) const override;
     virtual bool sample(const scene_rdl2::math::Vec3f &p, const scene_rdl2::math::Vec3f *n, float time, const scene_rdl2::math::Vec3f& r,
             scene_rdl2::math::Vec3f &wi, LightIntersection &isect, float rayDirFootprint) const override;
-    virtual scene_rdl2::math::Color eval(mcrt_common::ThreadLocalState* tls, const scene_rdl2::math::Vec3f &wi, const scene_rdl2::math::Vec3f &p,
-            const LightFilterRandomValues& filterR, float time, const LightIntersection &isect, bool fromCamera,
-            const LightFilterList *lightFilterList, float rayDirFootprint, float *pdf = nullptr) const override;
+    virtual scene_rdl2::math::Color eval(mcrt_common::ThreadLocalState* tls, const scene_rdl2::math::Vec3f &wi, 
+            const scene_rdl2::math::Vec3f &p, const LightFilterRandomValues& filterR, float time, 
+            const LightIntersection &isect, bool fromCamera, const LightFilterList *lightFilterList, 
+            const PathVertex *pv, float rayDirFootprint, float *visibility, float *pdf) const override;
     virtual scene_rdl2::math::Vec3f getEquiAngularPivot(const scene_rdl2::math::Vec3f& r, float time) const override;
 
     float getThetaO() const override { return scene_rdl2::math::sPi * 0.5f * mSpread; }

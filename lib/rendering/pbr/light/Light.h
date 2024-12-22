@@ -28,6 +28,8 @@ namespace ispc {
 namespace moonray {
 namespace pbr {
 
+class PathVertex;
+
 // Infinity, but not quite so we can distinguish from no light hit
 static const float sInfiniteLightDistance = scene_rdl2::math::sMaxValue - 1e32f;
 static const float sEnvLightDistance = sInfiniteLightDistance * 0.9f;
@@ -40,7 +42,7 @@ static const float sDistantLightDistance = sInfiniteLightDistance * 0.8f;
 /// @class Light Light.h <pbr/Light.h>
 /// @brief Base class that defines the light interface. All lights are assumed
 ///  to be area lights. All lights operate in render space.
-/// 
+///
 class Light
 {
     friend class LightTester;
@@ -60,15 +62,13 @@ public:
 
 
     /// Is this light active.
-    bool isOn() const { return mOn; }
+    virtual bool isOn() const { return mOn; }
 
     /// Is this light two-sided
     bool isTwoSided() const { return mSidedness == LIGHT_SIDEDNESS_2_SIDED; }
 
-    /// Is this light visible in camera, and if so is it opaque in the
-    /// alpha channel ?
+    /// Is this light visible in camera?
     bool getIsVisibleInCamera() const { return mIsVisibleInCamera; }
-    bool getIsOpaqueInAlpha() const { return mIsOpaqueInAlpha; }
 
     /// Return the rdlLight
     const scene_rdl2::rdl2::Light* getRdlLight() const { return mRdlLight; }
@@ -120,7 +120,7 @@ public:
     /// can be illuminated by this light (this is necessary so the culling
     /// calculations are accurate with sub-surface scattering).
     virtual bool canIlluminate(const scene_rdl2::math::Vec3f p, const scene_rdl2::math::Vec3f *n, float time,
-            float radius, const LightFilterList* lightFilterList) const = 0;
+            float radius, const LightFilterList* lightFilterList, const PathVertex* pv) const = 0;
 
     /// Compute an approximation to the total power for this light, so integrators
     /// can spend more samples towards lights that contribute more.
@@ -199,8 +199,9 @@ public:
     virtual scene_rdl2::math::Color eval(mcrt_common::ThreadLocalState* tls, const scene_rdl2::math::Vec3f &wi,
                                          const scene_rdl2::math::Vec3f &p, const LightFilterRandomValues& filterR,
                                          float time, const LightIntersection &isect, bool fromCamera,
-                                         const LightFilterList *lightFilterList, float rayDirFootprint,
-                                         float *pdf = nullptr) const = 0;
+                                         const LightFilterList *lightFilterList,
+                                         const PathVertex *pv, float rayDirFootprint,
+                                         float *visibility, float *pdf) const = 0;
 
     /// Query a position from light that will be used as pivot point for
     /// equi-angular sampling (part of volume scattering integration)
@@ -244,6 +245,9 @@ public:
     /// Get the maximum shadow distance
     float getMaxShadowDistance() const { return mMaxShadowDistance; }
 
+    /// Get the minimum shadow distance
+    float getMinShadowDistance() const { return mMinShadowDistance; }
+
     /// Get radiance
     scene_rdl2::math::Color getRadiance() const { return mRadiance; }
 
@@ -259,6 +263,10 @@ public:
     /// Get/set the light's index in the scene's light list
     uint32_t getSceneIndex() const { return mSceneIndex; }
     void setSceneIndex(uint32_t sceneIndex) { mSceneIndex = sceneIndex; }
+
+    virtual void turnOnPortal() { mHasPortal = true; }
+
+    bool hasPortal() const { return mHasPortal; }
 
 protected:
 
@@ -279,6 +287,7 @@ protected:
     void updateTextureFilter();
     void updateSidedness();
     void updateMaxShadowDistance();
+    void updateMinShadowDistance();
 
     /// See Light.hh for details
     finline bool isMb() const { return mMb; }

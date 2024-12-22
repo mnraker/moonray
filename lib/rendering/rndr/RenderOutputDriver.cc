@@ -212,7 +212,8 @@ RenderOutputDriver::Impl::Impl(const RenderContext *renderContext) :
     mZeroWeightMask(false),
     mRevertBeautyAuxAOV(false),
     mLastTileSamples(0),
-    mRenderContext(renderContext)
+    mRenderContext(renderContext),
+    mPrimaryAovIdx(-1)
 {
     parserConfigure();
 
@@ -447,36 +448,47 @@ RenderOutputDriver::Impl::Impl(const RenderContext *renderContext) :
         }
     }
 
-    //
-    // Create checkpoint related outfile path if it doesn't already exist
-    //
-    for (size_t i = 0; i < mFiles.size(); ++i){
-        if (!scene_rdl2::util::writeTest(mFiles[i].mName, true)){
-            throw std::runtime_error(std::string("Could not write to output file: ") + mFiles[i].mName);
-        }
-        if (mCheckpointRenderActive){
-            if (!mFiles[i].mCheckpointName.empty()) {
-                if (!scene_rdl2::util::writeTest(mFiles[i].mCheckpointName, true)){
-                    throw std::runtime_error(std::string("Could not access checkpoint file: ") +
-                                             mFiles[i].mCheckpointName);
-                }
-            }
-            if (!mFiles[i].mCheckpointMultiVersionName.empty()) {
-                if (!scene_rdl2::util::writeTest(mFiles[i].mCheckpointMultiVersionName, true)) {
-                    throw std::runtime_error(std::string("Could not access checkpoint multi-version file:") +
-                                             mFiles[i].mCheckpointMultiVersionName);
-                }
-            }
-        }
-    }
+    if (renderContext->isBackendComputation()) {
+        // We skip the preliminary output file permission check if moonray process is backend computation.
+        // Basically, the backend computation mode does not output images to the disk and we don't need
+        // output permission check as well. Skipping permission checks might reduce the risk related to
+        // process ownership and file permission issues especially under hdMoonray context.
+        scene_rdl2::logging::Logger::info("Backend computation detected. Output file permission check disabled");
 
-    //
-    // check temporary directory and create it it doesn't exist
-    //
-    std::string testFile = vars.getTmpDir() + "/__TMPDIR_ACCESS_TEST__";
-    if (!scene_rdl2::util::writeTest(testFile, true)) {
-        throw std::runtime_error(std::string("Could not access temporary directory:") +
-                                 vars.getTmpDir());
+    } else {
+        scene_rdl2::logging::Logger::info("Enabled output file permission check");
+
+        //
+        // Create checkpoint related outfile path if it doesn't already exist
+        //
+        for (size_t i = 0; i < mFiles.size(); ++i){
+            if (!scene_rdl2::util::writeTest(mFiles[i].mName, true)){
+                throw std::runtime_error(std::string("Could not write to output file: ") + mFiles[i].mName);
+            }
+            if (mCheckpointRenderActive){
+                if (!mFiles[i].mCheckpointName.empty()) {
+                    if (!scene_rdl2::util::writeTest(mFiles[i].mCheckpointName, true)){
+                        throw std::runtime_error(std::string("Could not access checkpoint file: ") +
+                                                 mFiles[i].mCheckpointName);
+                    }
+                }
+                if (!mFiles[i].mCheckpointMultiVersionName.empty()) {
+                    if (!scene_rdl2::util::writeTest(mFiles[i].mCheckpointMultiVersionName, true)) {
+                        throw std::runtime_error(std::string("Could not access checkpoint multi-version file:") +
+                                                 mFiles[i].mCheckpointMultiVersionName);
+                    }
+                }
+            }
+        }
+
+        //
+        // check temporary directory and create it it doesn't exist
+        //
+        std::string testFile = vars.getTmpDir() + "/__TMPDIR_ACCESS_TEST__";
+        if (!scene_rdl2::util::writeTest(testFile, true)) {
+            throw std::runtime_error(std::string("Could not access temporary directory:") +
+                                     vars.getTmpDir());
+        }
     }
 
     if (resumeRenderActive) {
@@ -563,6 +575,11 @@ RenderOutputDriver::Impl::Impl(const RenderContext *renderContext) :
                     mAovBuffers.push_back(aovBuffer);
 
                     schemaData.push_back(data);
+
+                    if (entry.mRenderOutput == vars.get(scene_rdl2::rdl2::SceneVariables::sPrimaryAov)) {
+                        setPrimaryAovIdx(aovBuffer);
+                    }
+
                     ++aovBuffer;
 
                     // denoiser input?
@@ -1077,6 +1094,7 @@ copyAndTransform(scene_rdl2::fb_util::PixelBuffer<DEST_PIXEL_TYPE> *destBuffer,
 void
 RenderOutputDriver::Impl::finishSnapshot(scene_rdl2::fb_util::VariablePixelBuffer *destBuffer, unsigned int indx,
                                          const scene_rdl2::fb_util::RenderBuffer *renderBuffer,
+                                         const scene_rdl2::fb_util::RenderBuffer *beautyBuffer,
                                          const scene_rdl2::fb_util::HeatMapBuffer *heatMapBuffer,
                                          const scene_rdl2::fb_util::FloatBuffer *weightBuffer,
                                          const scene_rdl2::fb_util::RenderBuffer *renderBufferOdd,
@@ -1086,9 +1104,9 @@ RenderOutputDriver::Impl::finishSnapshot(scene_rdl2::fb_util::VariablePixelBuffe
 
     switch (mEntries[indx]->mRenderOutput->getResult()) {
     case scene_rdl2::rdl2::RenderOutput::RESULT_BEAUTY:
-        // extract RGB from RenderBuffer
-        initializeDestBuffer(destBuffer, renderBuffer, scene_rdl2::fb_util::VariablePixelBuffer::FLOAT3);
-        copyAndTransform(&destBuffer->getFloat3Buffer(), renderBuffer,
+        // extract RGB from the beauty RenderBuffer
+        initializeDestBuffer(destBuffer, beautyBuffer, scene_rdl2::fb_util::VariablePixelBuffer::FLOAT3);
+        copyAndTransform(&destBuffer->getFloat3Buffer(), beautyBuffer,
                          [](scene_rdl2::math::Vec3f &dst, const scene_rdl2::fb_util::RenderColor &src) {
                              dst.x = src.x;
                              dst.y = src.y;
@@ -1494,7 +1512,95 @@ RenderOutputDriver::Impl::getChannelNames(const scene_rdl2::rdl2::RenderOutput *
             }
         }
 
-        if (ro->getCryptomatteEnableRefract()) {
+        if (ro->getCryptomatteRecordReflected()) {
+            for (int layer = 0; layer < numLayers; layer++) {
+                sprintf(channelName, "CryptomatteReflect%02d.R", layer);
+                chanNames.push_back(channelName);
+                sprintf(channelName, "CryptomatteReflect%02d.G", layer);
+                chanNames.push_back(channelName);
+                sprintf(channelName, "CryptomatteReflect%02d.B", layer);
+                chanNames.push_back(channelName);
+                sprintf(channelName, "CryptomatteReflect%02d.A", layer);
+                chanNames.push_back(channelName);
+            }
+            // position/normal/beauty data is defined per fragment, not per layer
+            for (int fragment = 0; fragment < numFragments; ++fragment) {
+                if (ro->getCryptomatteOutputPositions()) {
+                    sprintf(channelName, "CryptoReflectP%02d.R", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectP%02d.G", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectP%02d.B", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectP%02d.A", fragment);
+                    chanNames.push_back(channelName);
+                }
+                if (ro->getCryptomatteOutputP0()) {
+                    sprintf(channelName, "CryptoReflectP0%02d.R", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectP0%02d.G", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectP0%02d.B", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectP0%02d.A", fragment);
+                    chanNames.push_back(channelName);
+                }
+                if (ro->getCryptomatteOutputNormals()) {
+                    sprintf(channelName, "CryptoReflectN%02d.R", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectN%02d.G", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectN%02d.B", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectN%02d.A", fragment);
+                    chanNames.push_back(channelName);
+                }
+                if (ro->getCryptomatteOutputBeauty()) {
+                    sprintf(channelName, "CryptoReflectB%02d.R", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectB%02d.G", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectB%02d.B", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectB%02d.A", fragment);
+                    chanNames.push_back(channelName);
+                }
+                if (ro->getCryptomatteOutputRefP()) {
+                    sprintf(channelName, "CryptoReflectRefP%02d.R", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectRefP%02d.G", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectRefP%02d.B", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectRefP%02d.A", fragment);
+                    chanNames.push_back(channelName);
+                }
+                if (ro->getCryptomatteOutputRefN()) {
+                    sprintf(channelName, "CryptoReflectRefN%02d.R", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectRefN%02d.G", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectRefN%02d.B", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectRefN%02d.A", fragment);
+                    chanNames.push_back(channelName);
+                }
+                if (ro->getCryptomatteOutputUV()) {
+                    sprintf(channelName, "CryptoReflectUV%02d.R", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectUV%02d.G", fragment);
+                    chanNames.push_back(channelName);
+                }
+                if (ro->getCryptomatteSupportResumeRender()) {
+                    sprintf(channelName, "CryptoReflectS%02d.R", fragment);
+                    chanNames.push_back(channelName);
+                    sprintf(channelName, "CryptoReflectS%02d.G", fragment);
+                    chanNames.push_back(channelName);
+                }
+            }
+        }
+
+        if (ro->getCryptomatteRecordRefracted()) {
             for (int layer = 0; layer < numLayers; layer++) {
                 sprintf(channelName, "CryptomatteRefract%02d.R", layer);
                 chanNames.push_back(channelName);
@@ -2202,13 +2308,14 @@ RenderOutputDriver::loggingErrorAndInfo(ImageWriteCache *cache) const
 void
 RenderOutputDriver::finishSnapshot(scene_rdl2::fb_util::VariablePixelBuffer *destBuffer, unsigned int indx,
                                    const scene_rdl2::fb_util::RenderBuffer *renderBuffer,
+                                   const scene_rdl2::fb_util::RenderBuffer *beautyBuffer,
                                    const scene_rdl2::fb_util::HeatMapBuffer *heatMapBuffer,
                                    const scene_rdl2::fb_util::FloatBuffer *weightBuffer,
                                    const scene_rdl2::fb_util::RenderBuffer *renderBufferOdd,
                                    bool parallel) const
 {
     return mImpl->finishSnapshot(destBuffer, indx,
-                                 renderBuffer, heatMapBuffer, weightBuffer, renderBufferOdd,
+                                 renderBuffer, beautyBuffer, heatMapBuffer, weightBuffer, renderBufferOdd,
                                  parallel);
 }
 
@@ -2222,6 +2329,12 @@ int
 RenderOutputDriver::getDenoiserNormalInput() const
 {
     return mImpl->getDenoiserNormalInput();
+}
+
+int
+RenderOutputDriver::getPrimaryAovIdx() const
+{
+    return mImpl->getPrimaryAovIdx();
 }
 
 bool

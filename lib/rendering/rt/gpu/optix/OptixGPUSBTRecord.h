@@ -45,7 +45,7 @@ struct HitGroupData
         FLAT_BSPLINE_CURVES,
         FLAT_BEZIER_CURVES,
         ROUND_LINEAR_CURVES,
-        ROUND_CUBIC_BSPLINE_CURVES,
+        ROUND_BSPLINE_CURVES,
         POINTS,
         SPHERE,
         BOX
@@ -54,7 +54,7 @@ struct HitGroupData
     // Properties common to all primitives
     bool mIsSingleSided;
     bool mIsNormalReversed;
-    bool mVisibleShadow;
+    int mMask;
     int *mAssignmentIds;
     intptr_t mEmbreeUserData;
     unsigned int mEmbreeGeomID;
@@ -83,6 +83,7 @@ struct HitGroupData
         struct {
             int mMotionSamplesCount;
             unsigned int mSegmentsPerCurve;
+            int mNumIndices;
             const unsigned int* mIndices;
             int mNumControlPoints;
             const float4* mControlPoints;
@@ -99,9 +100,11 @@ struct HitGroupData
             float mZMin;
             float mZMax;
         } sphere;
-        // There is no TriMesh or RoundCurves here because the intersection program that uses
-        // these data is built in to Optix and these data have already been passed in via
-        // the Optix API elsewhere.
+        struct {
+            int mMotionSamplesCount;
+            const unsigned int* mIndices;
+            const float3* mVertices[16]; // MAX_MOTION_BLUR_SAMPLES
+        } mesh;
     };
 };
 
@@ -109,4 +112,3 @@ typedef SBTRecord<HitGroupData> HitGroupRecord;
 
 } // namespace rt
 } // namespace moonray
-

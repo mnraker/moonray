@@ -3,6 +3,7 @@
 
 
 #include "LightSetSampler.isph"
+#include <moonray/rendering/pbr/core/RayState.isph>
 #include <moonray/rendering/pbr/core/Util.isph>
 
 #include <scene_rdl2/render/util/Arena.isph>
@@ -59,9 +60,12 @@ LightSetSampler_sampleIntersectAndEval(
         uniform ShadingTLState * uniform tls,
         const uniform Light * uniform light,
         const uniform LightFilterList * uniform lightFilterList,
+        const varying PathVertex* uniform pv,
         const varying Vec3f &P, const varying Vec3f &cullingNormal, const varying LightFilterRandomValues &filterR, 
         varying float time, const varying Vec3f &r, varying LightSample &sample, varying float rayDirFootprint)
 {
+    sample.visibility = 1.0;
+
     // Draw a sample from light
     LightIntersection isect;
     // TODO: We compute the pdf in there but don't return it. Instead we compute
@@ -76,8 +80,8 @@ LightSetSampler_sampleIntersectAndEval(
     sample.distance = isect.distance;
 
     // Evaluate light sample
-    sample.Li = Light_eval(light, tls, sample.wi, P, filterR, time, isect, false, lightFilterList, rayDirFootprint,
-                           &sample.pdf);
+    sample.Li = Light_eval(light, tls, sample.wi, P, filterR, time, isect, false, lightFilterList, pv, rayDirFootprint,
+                           &sample.visibility, &sample.pdf);
     if (isSampleInvalid(sample.Li, sample.pdf)) {
         LightSample_setInvalid(&sample);
     }

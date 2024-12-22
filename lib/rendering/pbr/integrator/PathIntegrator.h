@@ -97,6 +97,7 @@ struct PathIntegratorParams
     int mIntegratorMaxSubsurfacePerPath;
     float mIntegratorTransparencyThreshold;
     float mIntegratorPresenceThreshold;
+    float mIntegratorPresenceQuality;
     float mIntegratorRussianRouletteThreshold;
     float mSampleClampingValue;
     int mSampleClampingDepth;
@@ -338,14 +339,16 @@ private:
             const shading::Intersection& isect, const float* lightSelectionPdfs) const;
 
     void addIndirectOrDirectVisibleContributions(pbr::TLState *pbrTls,
-            const Subpixel &sp, 
+            const Subpixel &sp,
             const PathVertex &parentPv, const BsdfSampler &bSampler,
             const BsdfSample *bsmp, const mcrt_common::RayDifferential &parentRay,
             float rayEpsilon, float shadowRayEpsilon,
             const shading::Intersection &isect, shading::BsdfLobe::Type indirectFlags,
             const scene_rdl2::rdl2::Material* newPriorityList[4], int newPriorityListCount[4],
             scene_rdl2::math::Color &radiance, unsigned &sequenceID,
-            float *aovs, CryptomatteParams *refractCryptomatteParams) const;
+            float *aovs,
+            CryptomatteParams *reflectedCryptomatteParams,
+            CryptomatteParams *refractedCryptomatteParams) const;
 
     // compute volume emission line integral along the ray
     scene_rdl2::math::Color computeEmissiveVolumeIntegral(pbr::TLState *pbrTls, mcrt_common::Ray& ray,
@@ -366,7 +369,9 @@ private:
             bool doIndirect, shading::BsdfLobe::Type indirectFlags, const scene_rdl2::rdl2::Material *newPriorityList[4],
             int newPriorityListCount[4], const LightSet &activeLightSet, const scene_rdl2::math::Vec3f *cullingNormal,
             float rayEpsilon, float shadowRayEpsilon, const scene_rdl2::math::Color &ssAov, unsigned &sequenceID,
-            float *aovs, CryptomatteParams *refractCryptomatteParams) const;
+            float *aovs,
+            CryptomatteParams *reflectedCryptomatteParams,
+            CryptomatteParams *refractedCryptomatteParams) const;
 
     // compute the emission contribution from volumes emitting energy
     // (something like fire and explosion) toward intersection point
@@ -398,12 +403,17 @@ private:
             unsigned sequenceID, float* aovs, const RayState *rs) const;
 
     // compute volume in-scattering integration estimator along the ray
-    scene_rdl2::math::Color integrateVolumeScattering(pbr::TLState *pbrTls, const mcrt_common::Ray& ray,
+    scene_rdl2::math::Color integrateVolumeScatteringDirect(pbr::TLState *pbrTls, const mcrt_common::Ray& ray,
             const VolumeProperties* volumeProperties,
             const GuideDistribution1D& densityDistribution,
             const Subpixel &sp, const PathVertex& pv,
             unsigned& sequenceID, float* aovs,
             DeepParams* deepParams, const RayState *rs) const;
+
+    scene_rdl2::math::Color integrateVolumeScatteringIndirect(pbr::TLState *pbrTls,
+            const mcrt_common::Ray& ray, const VolumeProperties* volumeProperties,
+            const GuideDistribution1D& densityDistribution,
+            const Subpixel &sp, const PathVertex& pv, unsigned sequenceID) const;
 
     scene_rdl2::math::Color equiAngularVolumeScattering(pbr::TLState *pbrTls,
             const mcrt_common::Ray& ray, int lightIndex,
@@ -411,16 +421,23 @@ private:
             float D, float thetaA, float thetaB, float offset,
             const VolumeProperties* volumeProperties,
             const GuideDistribution1D& densityDistribution,
-            const Subpixel &sp, unsigned& sequenceID, bool doMIS) const;
+            const Subpixel &sp, const PathVertex* pv, unsigned& sequenceID, bool doMIS) const;
 
-    scene_rdl2::math::Color distanceVolumeScattering(pbr::TLState *pbrTls,
+    scene_rdl2::math::Color distanceVolumeScatteringDirect(pbr::TLState *pbrTls,
             const mcrt_common::Ray& ray, int lightIndex,
             float ud, const scene_rdl2::math::Vec3f& ul, const LightFilterRandomValues& ulFilter,
             float D, float thetaA, float thetaB, float offset,
             const VolumeProperties* volumeProperties,
             const GuideDistribution1D& densityDistribution,
-            const Subpixel &sp, unsigned& sequenceID, bool doMIS,
+            const Subpixel &sp, const PathVertex* pv, unsigned& sequenceID, bool doMIS,
             float& td, scene_rdl2::math::Color& radiance, scene_rdl2::math::Color& transmittance) const;
+
+    scene_rdl2::math::Color distanceVolumeScatteringIndirect(pbr::TLState *pbrTls,
+            const mcrt_common::Ray& ray,
+            float ud, const scene_rdl2::math::Vec3f& ul,
+            const VolumeProperties* volumeProperties,
+            const GuideDistribution1D& densityDistribution,
+            const Subpixel &sp, const PathVertex& pv, unsigned sequenceID) const;
 
     scene_rdl2::math::Color approximateVolumeMultipleScattering(pbr::TLState *pbrTls, const mcrt_common::Ray& ray,
             const VolumeProperties* volumeProperties,
@@ -430,12 +447,17 @@ private:
 
     // estimator for volume scattering direct lighting contribution
     // from specified light to scatterPoint
-    scene_rdl2::math::Color estimateInScatteringSourceTerm(pbr::TLState *pbrTls, const mcrt_common::Ray& ray,
+    scene_rdl2::math::Color estimateInScatteringSourceTermDirect(pbr::TLState *pbrTls, const mcrt_common::Ray& ray,
             const scene_rdl2::math::Vec3f& scatterPoint, const Light* light, int assignmentId,
             const VolumePhase& phaseFunction,
             const scene_rdl2::math::Vec3f& ul, const LightFilterRandomValues& ulFilter,
-            const Subpixel &sp, unsigned sequenceID,
+            const Subpixel &sp, const PathVertex* pv, unsigned sequenceID,
             float scaleFactor = 1.0f) const;
+
+    scene_rdl2::math::Color estimateInScatteringSourceTermIndirect(pbr::TLState *pbrTls, const mcrt_common::Ray& ray,
+            const scene_rdl2::math::Vec3f& scatterPoint,
+            const VolumePhase& phaseFunction, const scene_rdl2::math::Vec3f& ul,
+            const Subpixel &sp, const PathVertex& pv, unsigned sequenceID) const;
 
     scene_rdl2::math::Color transmittanceSubinterval(pbr::TLState *pbrTls,
             float t0, float t1,
@@ -467,7 +489,8 @@ private:
             scene_rdl2::math::Color &radiance, float &transparency, VolumeTransmittance& vt,
             unsigned &sequenceID, float *aovs, float *depth,
             DeepParams* deepParams, CryptomatteParams *cryptomatteParams,
-            CryptomatteParams *refractCryptomatteParams,
+            CryptomatteParams *reflectedCryptomatteParams,
+            CryptomatteParams *refractedCryptomatteParams,
             bool ignoreVolumes, bool &hitVolume) const;
 
     scene_rdl2::math::Color computeRadianceSubsurfaceSample(pbr::TLState *pbrTls,
@@ -503,8 +526,10 @@ private:
     // receiverId is set to -1 in the general case because we only need to pass a valid Id when there is
     // shadow-linking information present. skipOcclusionFilter() makes use of this value to suppress occusion
     // of a specified shadow receiver by the specified shadow caster in the shadow-linking info.
-    bool isRayOccluded(pbr::TLState *pbrTls, const Light* light, mcrt_common::Ray& shadowRay, float rayEpsilon,
-                       float shadowRayEpsilon, float& presence, int receiverId, bool isVolume = false) const;
+    bool isRayOccluded(TLState *pbrTls, const Light* light, mcrt_common::Ray& shadowRay,
+                       float rayEpsilon, float shadowRayEpsilon,
+                       const Subpixel &sp, unsigned sequenceID, const scene_rdl2::math::Color& throughput,
+                       float& presence, int receiverId, bool isVolume = false) const;
 
     PATH_INTEGRATOR_MEMBERS;
 };

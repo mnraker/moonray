@@ -4,6 +4,7 @@
 
 #include "RectLight.h"
 #include <moonray/rendering/pbr/core/Distribution.h>
+#include <moonray/rendering/pbr/core/RayState.h>
 #include <moonray/rendering/pbr/core/Util.h>
 
 #include <moonray/rendering/pbr/light/RectLight_ispc_stubs.h>
@@ -158,6 +159,7 @@ RectLight::update(const Mat4d& world2render)
     updateRayTermination();
     updateTextureFilter();
     updateMaxShadowDistance();
+    updateMinShadowDistance();
 
     mWidth  = mRdlLight->get<scene_rdl2::rdl2::Float>(sWidthKey);
     mHeight = mRdlLight->get<scene_rdl2::rdl2::Float>(sHeightKey);
@@ -215,19 +217,13 @@ RectLight::update(const Mat4d& world2render)
 
 //----------------------------------------------------------------------------
 
+// Helper function called by both RectLight and PortalLight.
+// TODO: rewrite this; it isn't great. We don't need to compute 4 separate distances.
 bool
-RectLight::canIlluminate(const Vec3f p, const Vec3f *n, float time, float radius,
-    const LightFilterList* lightFilterList) const
+RectLight::canIlluminateHelper(const Vec3f p, const Vec3f *n, float time, float radius,
+    const LightFilterList* lightFilterList, const PathVertex* pv) const
 {
-    MNRY_ASSERT(mOn);
-
-    // Cull points which are completely on the backside of the light, taking sidedness into account
-    const float threshold = sEpsilon - radius;
-    if ((mSidedness != LightSidednessType::LIGHT_SIDEDNESS_2_SIDED) && (planeDistance(p, time) < threshold)) {
-        return false;
-    }
-
-    // Cull lights which are completely on the backside of the point.
+    // Cull the light if it's completely on the backside of the point.
     if (n) {
         Plane pl(p, *n);
         float d0, d1, d2, d3;
@@ -244,6 +240,7 @@ RectLight::canIlluminate(const Vec3f p, const Vec3f *n, float time, float radius
             d2 = pl.getDistance(corners[2]);
             d3 = pl.getDistance(corners[3]);
         }
+        const float threshold = sEpsilon - radius;
         bool canIllum = d0 > threshold || d1 > threshold ||
                         d2 > threshold || d3 > threshold;
         if (!canIllum) return false;
@@ -254,11 +251,26 @@ RectLight::canIlluminate(const Vec3f p, const Vec3f *n, float time, float radius
             { getPosition(time),
               xformLocal2RenderScale(math::sqrt(mWidth * mWidth + mHeight * mHeight) / 2, time),
               p, getXformRender2Local(time, lightFilterList->needsLightXform()),
-              radius, time
+              radius, time, pv
             });
     }
 
     return true;
+}
+
+bool
+RectLight::canIlluminate(const Vec3f p, const Vec3f *n, float time, float radius,
+    const LightFilterList* lightFilterList, const PathVertex* pv) const
+{
+    MNRY_ASSERT(mOn);
+
+    // Cull points which are completely on the backside of the light, taking sidedness into account
+    const float threshold = sEpsilon - radius;
+    if ((mSidedness != LightSidednessType::LIGHT_SIDEDNESS_2_SIDED) && (planeDistance(p, time) < threshold)) {
+        return false;
+    }
+
+    return canIlluminateHelper(p, n, time, radius, lightFilterList, pv);
 }
 
 bool
@@ -473,9 +485,10 @@ RectLight::sample(const Vec3f &p, const Vec3f *n, float time, const Vec3f& r,
 }
 
 Color
-RectLight::eval(mcrt_common::ThreadLocalState* tls, const Vec3f &wi, const Vec3f &p, const LightFilterRandomValues& filterR, float time,
-        const LightIntersection &isect, bool fromCamera, const LightFilterList *lightFilterList, float rayDirFootprint,
-        float *pdf) const
+RectLight::eval(mcrt_common::ThreadLocalState* tls, const Vec3f &wi, const Vec3f &p, 
+        const LightFilterRandomValues& filterR, float time, const LightIntersection &isect, bool fromCamera, 
+        const LightFilterList *lightFilterList, const PathVertex *pv, float rayDirFootprint,
+        float *visibility, float *pdf) const
 {
     MNRY_ASSERT(mOn);
 
@@ -494,14 +507,15 @@ RectLight::eval(mcrt_common::ThreadLocalState* tls, const Vec3f &wi, const Vec3f
     }
 
     if (lightFilterList) {
-        evalLightFilterList(lightFilterList, 
+        evalLightFilterList(lightFilterList,
                             { tls, &isect, getPosition(time),
                               getDirection(time), p,
-                              filterR, time,
+                              filterR, time, pv,
                               getXformRender2Local(time, lightFilterList->needsLightXform()),
                               wi
                             },
-                            radiance);
+                            radiance,
+                            visibility);
     }
 
     if (pdf) {

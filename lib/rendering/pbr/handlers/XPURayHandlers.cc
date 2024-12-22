@@ -7,6 +7,7 @@
 #include <moonray/rendering/pbr/core/Aov.h>
 
 #include <moonray/rendering/geom/prim/BVHUserData.h>
+#include <moonray/rendering/geom/prim/Instance.h>
 #include <moonray/rendering/geom/prim/Primitive.h>
 #include <moonray/rendering/mcrt_common/Clock.h>
 #include <moonray/rendering/mcrt_common/ProfileAccumulatorHandles.h>
@@ -250,8 +251,28 @@ xpuRayBundleHandler(mcrt_common::ThreadLocalState *tls,
             rs->mRay.instID = -1;
             rs->mRay.ext.userData = reinterpret_cast<void*>(isects[i].mEmbreeUserData);
 
+            void* topLevelInstance = accel->instanceIdToInstancePtr(isects[i].mInstance0IdOrLight);
+            rs->mRay.ext.instance0OrLight = topLevelInstance;
+            rs->mRay.ext.instance1 = accel->instanceIdToInstancePtr(isects[i].mInstance1Id);
+            rs->mRay.ext.instance2 = accel->instanceIdToInstancePtr(isects[i].mInstance2Id);
+            rs->mRay.ext.instance3 = accel->instanceIdToInstancePtr(isects[i].mInstance3Id);
+            rs->mRay.ext.l2r = scene_rdl2::math::Xform3f(
+                isects[i].mL2R[0][0], isects[i].mL2R[0][1], isects[i].mL2R[0][2],
+                isects[i].mL2R[1][0], isects[i].mL2R[1][1], isects[i].mL2R[1][2],
+                isects[i].mL2R[2][0], isects[i].mL2R[2][1], isects[i].mL2R[2][2],
+                isects[i].mL2R[3][0], isects[i].mL2R[3][1], isects[i].mL2R[3][2]);
+
+            if (topLevelInstance != nullptr) {
+                geom::internal::Instance* inst = reinterpret_cast<geom::internal::Instance*>(topLevelInstance);
+                int geomID = inst->getGeomID();
+                // both geomID and instID are set to the instance's geomID
+                rs->mRay.geomID = geomID;
+                rs->mRay.instID = geomID;
+            }
+
+#if 0 // debugging code
             // Validate the GPU intersection results against CPU Embree
-            if (true) {
+            {
                 const rt::EmbreeAccelerator *embreeAccel = fs.mEmbreeAccel;
                 embreeAccel->intersect(rsCPU.mRay);
 
@@ -269,31 +290,54 @@ xpuRayBundleHandler(mcrt_common::ThreadLocalState *tls,
                             std::cout << "ray: " << i << " embree ext.userData: " << rsCPU.mRay.ext.userData << 
                                         " optix ext.userData: " << rs->mRay.ext.userData << std::endl;
                         }
+                        if (rs->mRay.instID != -1) {
+                            if (rs->mRay.ext.instance0OrLight != rsCPU.mRay.ext.instance0OrLight) {
+                                std::cout << "ray: " << i << " embree ext.instance0OrLight: " << rsCPU.mRay.ext.instance0OrLight <<
+                                            " optix ext.instance0OrLight: " << rs->mRay.ext.instance0OrLight << std::endl;
+                            }
+                            if ((!scene_rdl2::math::isEqual(rs->mRay.ext.l2r.l.vx.x, rsCPU.mRay.ext.l2r.l.vx.x, 0.001f)) ||
+                                (!scene_rdl2::math::isEqual(rs->mRay.ext.l2r.l.vx.y, rsCPU.mRay.ext.l2r.l.vx.y, 0.001f)) ||
+                                (!scene_rdl2::math::isEqual(rs->mRay.ext.l2r.l.vx.z, rsCPU.mRay.ext.l2r.l.vx.z, 0.001f)) ||
+                                (!scene_rdl2::math::isEqual(rs->mRay.ext.l2r.l.vy.x, rsCPU.mRay.ext.l2r.l.vy.x, 0.001f)) ||
+                                (!scene_rdl2::math::isEqual(rs->mRay.ext.l2r.l.vy.y, rsCPU.mRay.ext.l2r.l.vy.y, 0.001f)) ||
+                                (!scene_rdl2::math::isEqual(rs->mRay.ext.l2r.l.vy.z, rsCPU.mRay.ext.l2r.l.vy.z, 0.001f)) ||
+                                (!scene_rdl2::math::isEqual(rs->mRay.ext.l2r.l.vz.x, rsCPU.mRay.ext.l2r.l.vz.x, 0.001f)) ||
+                                (!scene_rdl2::math::isEqual(rs->mRay.ext.l2r.l.vz.y, rsCPU.mRay.ext.l2r.l.vz.y, 0.001f)) ||
+                                (!scene_rdl2::math::isEqual(rs->mRay.ext.l2r.l.vz.z, rsCPU.mRay.ext.l2r.l.vz.z, 0.001f)) ||
+                                (!scene_rdl2::math::isEqual(rs->mRay.ext.l2r.p.x, rsCPU.mRay.ext.l2r.p.x, 0.001f)) ||
+                                (!scene_rdl2::math::isEqual(rs->mRay.ext.l2r.p.y, rsCPU.mRay.ext.l2r.p.y, 0.001f)) ||
+                                (!scene_rdl2::math::isEqual(rs->mRay.ext.l2r.p.z, rsCPU.mRay.ext.l2r.p.z, 0.001f))) {
+                                    std::cout << "ray: " << i << " embree ext.l2r: " << rsCPU.mRay.ext.l2r << std::endl <<
+                                            "     optix ext.l2r: " << rs->mRay.ext.l2r << std::endl;
+                            }
+                        }
                         if (rs->mRay.primID == rsCPU.mRay.primID) {
                             if (!scene_rdl2::math::isEqual(rs->mRay.tfar, rsCPU.mRay.tfar, 0.001f)) {
                                 std::cout << "ray: " << i << " embree tfar: " << rsCPU.mRay.tfar << " optix tfar: " << rs->mRay.tfar << std::endl;
                             }
-                            if (!scene_rdl2::math::isEqual(rs->mRay.u, rsCPU.mRay.u, 0.001f)) {
+                            if (!scene_rdl2::math::isEqual(rs->mRay.u, rsCPU.mRay.u, 0.005f)) {
                                 std::cout << "ray: " << i << " embree u: " << rsCPU.mRay.u << " optix u: " << rs->mRay.u << std::endl;
                             }
-                            if (!scene_rdl2::math::isEqual(rs->mRay.v, rsCPU.mRay.v, 0.001f)) {
+                            if (!scene_rdl2::math::isEqual(rs->mRay.v, rsCPU.mRay.v, 0.005f)) {
                                 std::cout << "ray: " << i << " embree v: " << rsCPU.mRay.v << " optix v: " << rs->mRay.v << std::endl;
                             }
-                            /*
-                            if (!scene_rdl2::math::isEqual(rs->mRay.Ng.x, rsCPU.mRay.Ng.x, 0.001f)) {
-                                std::cout << "ray: " << i << " embree Ng.x: " << rsCPU.mRay.Ng.x << " optix Ng.x: " << rs->mRay.Ng.x << std::endl;
+                            if (rs->mRay.Ng.x != 0.f || rs->mRay.Ng.y != 0.f || rs->mRay.Ng.z != 1.f) {
+                                // Ignore unused curves Ng when Ng = 0 0 1
+                                if (!scene_rdl2::math::isEqual(rs->mRay.Ng.x, rsCPU.mRay.Ng.x, 0.005f)) {
+                                    std::cout << "ray: " << i << " embree Ng.x: " << rsCPU.mRay.Ng.x << " optix Ng.x: " << rs->mRay.Ng.x << std::endl;
+                                }
+                                if (!scene_rdl2::math::isEqual(rs->mRay.Ng.y, rsCPU.mRay.Ng.y, 0.005f)) {
+                                    std::cout << "ray: " << i << " embree Ng.y: " << rsCPU.mRay.Ng.y << " optix Ng.y: " << rs->mRay.Ng.y << std::endl;
+                                }
+                                if (!scene_rdl2::math::isEqual(rs->mRay.Ng.z, rsCPU.mRay.Ng.z, 0.005f)) {
+                                    std::cout << "ray: " << i << " embree Ng.z: " << rsCPU.mRay.Ng.z << " optix Ng.z: " << rs->mRay.Ng.z << std::endl;
+                                }
                             }
-                            if (!scene_rdl2::math::isEqual(rs->mRay.Ng.y, rsCPU.mRay.Ng.y, 0.001f)) {
-                                std::cout << "ray: " << i << " embree Ng.y: " << rsCPU.mRay.Ng.y << " optix Ng.y: " << rs->mRay.Ng.y << std::endl;
-                            }
-                            if (!scene_rdl2::math::isEqual(rs->mRay.Ng.z, rsCPU.mRay.Ng.z, 0.001f)) {
-                                std::cout << "ray: " << i << " embree Ng.z: " << rsCPU.mRay.Ng.z << " optix Ng.z: " << rs->mRay.Ng.z << std::endl;
-                            }
-                            */
                         }
                     }
                 }
             }
+#endif
         }
     }
 
@@ -513,22 +557,17 @@ xpuRayBundleHandler(mcrt_common::ThreadLocalState *tls,
                         // stochastically sampling just one.
 
                         LightFilterRandomValues lightFilterR = {
-                            scene_rdl2::math::Vec2f(0.f, 0.f), 
+                            scene_rdl2::math::Vec2f(0.f, 0.f),
                             scene_rdl2::math::Vec3f(0.f, 0.f, 0.f)}; // light filters don't apply to camera rays
                         radiance = rs->mPathVertex.pathThroughput *
                             hitLight->eval(tls, rs->mRay.getDirection(), rs->mRay.getOrigin(),
-                                           lightFilterR, rs->mRay.getTime(), hitLightIsect, true, nullptr,
-                                           rs->mRay.getDirFootprint()) * numHits;
+                                           lightFilterR, rs->mRay.getTime(), hitLightIsect, true, nullptr, nullptr,
+                                           rs->mRay.getDirFootprint(), nullptr, nullptr) * numHits;
                         // attenuate based on volume transmittance
                         if (rs->mVolHit) radiance *= (rs->mVolTr * rs->mVolTh);
 
-                        // alpha depends on light opacity and volumes
-                        if (hitLight->getIsOpaqueInAlpha()) {
-                            // We hit a visible light that is opaque in alpha.
-                            // Volumes are irrelevant, the alpha contribution is
-                            // the full pixel weight.
-                            alpha = rs->mPathVertex.pathPixelWeight;
-                        } else if (rs->mVolHit) {
+                        // alpha depends on volumes
+                        if (rs->mVolHit) {
                             // We hit a visible light, but the light is not
                             // opaque in alpha (e.g. a distant or env light).
                             // There is a volume along this ray.  The volume

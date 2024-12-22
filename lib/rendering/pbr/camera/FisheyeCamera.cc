@@ -20,7 +20,8 @@ scene_rdl2::rdl2::AttributeKey<scene_rdl2::rdl2::Float> FisheyeCamera::sZoomKey;
 FisheyeCamera::FisheyeCamera(const scene_rdl2::rdl2::Camera* rdlCamera) :
     Camera(rdlCamera),
     mMapping(0),
-    mRadialScale(0.0f)
+    mRadialScale(0.0f),
+    mDerivScale(0.0f)
 {
     initAttributeKeys(rdlCamera->getSceneClass());
 }
@@ -48,30 +49,31 @@ void FisheyeCamera::updateImpl(const Mat4d& world2render)
 {
     mMapping = getRdlCamera()->get(sMappingKey);
 
-    const float w = getApertureWindowWidth();
-    const float h = getApertureWindowHeight();
+    const float w = getRegionWindowWidth();
+    const float h = getRegionWindowHeight();
 
     int format  = getRdlCamera()->get(sFormatKey);
     float diameter;
     switch (format) {
-    case 0:
-        // circular
+    case FORMAT_CIRCULAR:
         diameter = scene_rdl2::math::min(w, h);
         break;
-    case 1:
-        // cropped
+    case FORMAT_CROPPED:
         diameter = scene_rdl2::math::max(w, h);
         break;
-    case 2:
-    default:
-        // diagonal
+    case FORMAT_DIAGONAL:
         diameter = scene_rdl2::math::sqrt(w*w + h*h);
+        break;
+    default:
+        MNRY_ASSERT_REQUIRE(false, "Unsupported case label.");
         break;
     }
     mRadialScale = 2.0f / diameter;
 
     const float zoom = getRdlCamera()->get(sZoomKey);
     mRadialScale /= zoom;
+
+    mDerivScale = 1.0f / (mRadialScale * h);
 }
 
 void FisheyeCamera::createRayImpl(mcrt_common::RayDifferential* dstRay,
@@ -95,63 +97,82 @@ void FisheyeCamera::createRayImpl(mcrt_common::RayDifferential* dstRay,
     const Vec3f dir_dx = transformVector(ct2render, createDirection(x+1.0f, y));
     const Vec3f dir_dy = transformVector(ct2render, createDirection(x, y+1.0f));
 
+    // A fisheye lens needs to capture only the hemisphere in front of the camera,
+    // i.e. with -ve z-component. We invalidate the ray if it has +ve z-component.
+    // This invalidation is done by setting the ray's near and far to sMaxValue.
+    float near, far;
+    if (dir.z <= 0.0f) {
+        near = getNear();
+        far  = getFar();
+    } else {
+        // invalidate backwards-pointing rays
+        near = scene_rdl2::math::sMaxValue;
+        far  = scene_rdl2::math::sMaxValue;
+    }
+
     *dstRay = mcrt_common::RayDifferential(
         org, dir,
         org, dir_dx,
         org, dir_dy,
-        getNear(), getFar(), time, 0);
+        near, far, time, 0);
 }
 
-Vec3f FisheyeCamera::createDirection(float x, float y) const
+Vec3f FisheyeCamera::createDirection(float X, float Y) const
 {
-    const float w = getApertureWindowWidth();
-    const float h = getApertureWindowHeight();
+    const float W = getRegionWindowWidth();
+    const float H = getRegionWindowHeight();
 
-    x -= 0.5f * w;
-    y -= 0.5f * h;
+    X -= 0.5f * W;
+    Y -= 0.5f * H;
 
-    const float d = scene_rdl2::math::sqrt(x*x + y*y);
-    const float r = d * mRadialScale;
+    const float D = scene_rdl2::math::sqrt(X*X + Y*Y);
+    const float R = D * mRadialScale;
 
     float sintheta, costheta;
     switch (mMapping) {
-    case 0: {
-        // stereographic
-        // theta = 2.0f * atan(r);
-        float q = 1.0f / (1.0f + r*r);
-        sintheta = 2.0f * r * q;
-        costheta = (1.0f - r*r) * q;
+    case MAPPING_STEREOGRAPHIC: {
+        // theta = 2.0f * atan(R);
+        float Q = 1.0f / (1.0f + R*R);
+        sintheta = 2.0f * R * Q;
+        costheta = (1.0f - R*R) * Q;
+        break;
     }
-    break;
-    case 1: {
-        // equidistant
-        // theta = sHalfPi * r;
-        sincos(sHalfPi * r, &sintheta, &costheta);
-    }
-    break;
-    case 2: {
-        // equisolid angle
-        // theta = 2.0f * asin(r * sqrt(0.5f));
-        sintheta = r * scene_rdl2::math::sqrt(2.0f - r*r);
-        costheta = 1.0f - r*r;
-    }
-    break;
-    case 3:
-    default: {
-        // orthographic
-        // theta = asin(r);
-        sintheta = r;
-        costheta = scene_rdl2::math::sqrt(1.0f - r*r);
-    }
-    break;
+    case MAPPING_EQUIDISTANT:
+        // theta = sHalfPi * R;
+        sincos(sHalfPi * R, &sintheta, &costheta);
+        break;
+    case MAPPING_EQUISOLID_ANGLE:
+        // theta = 2.0f * asin(R * sqrt(0.5f));
+        sintheta = R * scene_rdl2::math::sqrt(2.0f - R*R);
+        costheta = 1.0f - R*R;
+        break;
+    case MAPPING_ORTHOGRAPHIC:
+        // theta = asin(R);
+        sintheta = R;
+        costheta = scene_rdl2::math::sqrt(1.0f - R*R);
+        break;
+    default:
+        MNRY_ASSERT_REQUIRE(false, "Unsupported case label.");
+        break;
     }
 
-    const float cosphi = x / d;
-    const float sinphi = y / d;
+    const float cosphi = D ? X/D : 1.0f;
+    const float sinphi = D ? Y/D : 0.0f;
 
     Vec3f dir(sintheta * cosphi, sintheta * sinphi, -costheta);
 
     return dir;
+}
+
+void
+FisheyeCamera::computeFishtumImpl(mcrt_common::Fishtum *f, float t,
+                                      bool useRenderRegion) const
+{
+    f->mRadialScale = mRadialScale;
+    f->mDerivScale  = mDerivScale;
+    f->mMapping     = mMapping;
+    f->mWidth       = useRenderRegion ? (int)getRegionWindowWidth()  : (int)getApertureWindowWidth();
+    f->mHeight      = useRenderRegion ? (int)getRegionWindowHeight() : (int)getApertureWindowHeight();
 }
 
 } // namespace pbr

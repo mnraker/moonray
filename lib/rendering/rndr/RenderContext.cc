@@ -647,10 +647,17 @@ RenderContext::bakeGeometry(std::vector<std::unique_ptr<geom::BakedMesh>>& baked
         camera->computeFrustum(&frustums.back(), 1, true);  // frustum at shutter close
     }
 
+    std::vector<mcrt_common::Fishtum> fishtums;
+    if (camera->hasFishtum()) {
+        fishtums.push_back(mcrt_common::Fishtum());
+        camera->computeFishtum(&fishtums.back(), 0, true);  // fishtum at shutter open
+    }
+
     const scene_rdl2::rdl2::Camera* dicingCamera = mSceneContext->getDicingCamera();
     mGeometryManager->bakeGeometry(mLayer,
                                    motionBlurParams,
                                    frustums,
+                                   fishtums,
                                    world2render,
                                    bakedMeshes,
                                    bakedCurves,
@@ -801,11 +808,16 @@ RenderContext::startFrame()
             executionModeString += ".";
             mExecutionMode = ExecutionMode::SCALAR;
         } else {
-            executionModeString = "Executing an XPU render since execution mode was set to auto.";
-            allowUnsupportedXPUFeatures = false; // want to fall back if unsupported
-            mExecutionMode = ExecutionMode::XPU;
+            // Uncomment the following to have AUTO mode start with XPU:
+            //   executionModeString = "Executing an XPU render since execution mode was set to auto.";
+            //   allowUnsupportedXPUFeatures = false; // want to fall back if unsupported
+            //   mExecutionMode = ExecutionMode::XPU;
             // If there is an error setting up the GPU, we will fall back to vector mode
             // in GeometryManager::updateGPUAccelerator().
+
+            // AUTO mode starts with vector mode
+            executionModeString = "Executing a vectorized render since execution mode was set to auto.";
+            mExecutionMode = ExecutionMode::VECTORIZED;
         }    
     }
 
@@ -829,25 +841,19 @@ RenderContext::startFrame()
 
 #if defined(USE_PARTITIONED_PIXEL)
         if (!mPbrScene->getRdlSceneContext()->getSceneVariables().get(temporalKey)) {
-            if (mOptions.getApplicationMode() != ApplicationMode::MOTIONCAPTURE) {
-                pbr::kPixelPartition.rotate(frameNum);
-            }
+            pbr::kPixelPartition.rotate(frameNum);
         }
 #endif
 
 #if defined(USE_PARTITIONED_LENS)
         if (!mPbrScene->getRdlSceneContext()->getSceneVariables().get(temporalKey)) {
-            if (mOptions.getApplicationMode() != ApplicationMode::MOTIONCAPTURE) {
-                pbr::kLensPartition.rotate(frameNum);
-            }
+            pbr::kLensPartition.rotate(frameNum);
         }
 #endif
 
 #if defined(USE_PARTITIONED_TIME)
         if (!mPbrScene->getRdlSceneContext()->getSceneVariables().get(temporalKey)) {
-            if (mOptions.getApplicationMode() != ApplicationMode::MOTIONCAPTURE) {
-                pbr::kTimePartition.rotate(frameNum);
-            }
+            pbr::kTimePartition.rotate(frameNum);
         }
 #endif
     }
@@ -918,8 +924,7 @@ RenderContext::startFrame()
 
     // Don't spam the logs if in real-time mode.
     // mTotalRenderPrepTime was set inside of the prep function call
-    if (getRenderMode() != RenderMode::REALTIME &&
-        mOptions.getApplicationMode() != ApplicationMode::MOTIONCAPTURE) {
+    if (getRenderMode() != RenderMode::REALTIME) {
         if (mLogTime) { // only print this if previous pass printing timing
             mRenderStats->logInfoEmptyLine();
             mRenderStats->updateAndLogRenderPrepStats();
@@ -992,6 +997,8 @@ RenderContext::startFrame()
 
     // Setup the XPU queues in the RenderDriver if we are XPU accelerated.
     if (frameState.mExecutionMode == mcrt_common::ExecutionMode::XPU) {
+        // Free any existing queues.  TODO: be smarter about not recreating these.
+        mDriver->freeXPUQueues();
         mDriver->createXPUQueues(frameState.mGPUAccel);
     }
 
@@ -1001,8 +1008,7 @@ RenderContext::startFrame()
     }
 
     // Don't spam the logs if in real-time mode.
-    if (getRenderMode() != RenderMode::REALTIME &&
-        mOptions.getApplicationMode() != ApplicationMode::MOTIONCAPTURE) {
+    if (getRenderMode() != RenderMode::REALTIME) {
 
         if (frameState.mExecutionMode == mcrt_common::ExecutionMode::VECTORIZED ||
             frameState.mExecutionMode == mcrt_common::ExecutionMode::XPU) {
@@ -1099,8 +1105,7 @@ RenderContext::stopFrame()
     // looking at the result, and then deciding to move the camera again.
     // The decision for this pass is remembered in mLogTime for next pass to stop
     // it from printing renderprep timing.
-    if (getRenderMode() != RenderMode::REALTIME &&
-        mOptions.getApplicationMode() != ApplicationMode::MOTIONCAPTURE) {
+    if (getRenderMode() != RenderMode::REALTIME) {
         if (isFrameComplete() || mPbrStatistics->mMcrtTime >= 10.0) {
             mLogTime = true;
             mRenderStats->logInfoEmptyLine();
@@ -1179,6 +1184,19 @@ RenderContext::getCurrentFrame() const
     return mSceneContext->getSceneVariables().get(scene_rdl2::rdl2::SceneVariables::sFrameKey);
 }
 
+bool
+RenderContext::isBackendComputation() const
+//
+// This API detects moonray process as back-end computation or a regular standalone moonray process.
+//
+{
+    // This is a heuristic solution to detect moonray is executed as backend computation or regular
+    // process. We don't execute the command line option parsing when the backend computation mode
+    // The internal command line data string is created if command line parsing APIs are used.
+    // So we use this data for detection.
+    return mOptions.getCommandLine().empty();
+}
+
 scene_rdl2::math::HalfOpenViewport
 RenderContext::getRezedRegionWindow() const
 {
@@ -1217,10 +1235,20 @@ RenderContext::getScene() const
 }
 
 void
-RenderContext::snapshotRenderBuffer(scene_rdl2::fb_util::RenderBuffer *renderBuffer, bool untile, bool parallel) const
+RenderContext::snapshotRenderBuffer(scene_rdl2::fb_util::RenderBuffer *renderBuffer, bool untile, 
+                                    bool parallel, bool usePrimaryAov) const
 {
-    // Request a snapshot from the render driver.
-    mDriver->snapshotRenderBuffer(MNRY_VERIFY(renderBuffer), untile, parallel);
+    if (!mRenderOutputDriver) {
+        mDriver->snapshotRenderBuffer(MNRY_VERIFY(renderBuffer), untile, parallel);
+    } else {
+        int primaryAovIdx = mRenderOutputDriver->getPrimaryAovIdx();
+        if (usePrimaryAov && primaryAovIdx >= 0) {
+            snapshotAovBuffer(renderBuffer, primaryAovIdx, untile, parallel);
+        } else {
+            // Request a snapshot from the render driver.
+            mDriver->snapshotRenderBuffer(MNRY_VERIFY(renderBuffer), untile, parallel);
+        }
+    }
 }
 
 void
@@ -1515,6 +1543,7 @@ RenderContext::snapshotDisplayFilterBuffers(std::vector<scene_rdl2::fb_util::Var
 void
 RenderContext::snapshotRenderOutput(scene_rdl2::fb_util::VariablePixelBuffer *buffer, int roIndx,
                                     const scene_rdl2::fb_util::RenderBuffer *renderBuffer,
+                                    const scene_rdl2::fb_util::RenderBuffer *beautyBuffer,
                                     const scene_rdl2::fb_util::HeatMapBuffer *heatMapBuffer,
                                     const scene_rdl2::fb_util::FloatBuffer *weightBuffer,
                                     const scene_rdl2::fb_util::RenderBuffer *renderBufferOdd,
@@ -1529,7 +1558,7 @@ RenderContext::snapshotRenderOutput(scene_rdl2::fb_util::VariablePixelBuffer *bu
         mRenderOutputDriver->requiresWeightBuffer(roIndx) ||
         mRenderOutputDriver->requiresRenderBufferOdd(roIndx)) {
         mRenderOutputDriver->finishSnapshot(buffer, roIndx,
-                                            renderBuffer, heatMapBuffer, weightBuffer, renderBufferOdd,
+                                            renderBuffer, beautyBuffer, heatMapBuffer, weightBuffer, renderBufferOdd,
                                             parallel);
         return;
     }
@@ -1844,11 +1873,8 @@ RenderContext::renderPrep(bool allowUnsupportedXPUFeatures)
         const scene_rdl2::rdl2::SceneVariables & sv = mSceneContext->getSceneVariables();
 
         // Check for the need to reload all procedurals for changes in frame
-        // or motion blur. If the applicationMode is set to MOTIONCAPTURE
-        // the program will not load geometry from disk each time
-        // the frame ID changes
-        bool frameChanged = (sv.hasChanged(scene_rdl2::rdl2::SceneVariables::sFrameKey) &&
-            mOptions.getApplicationMode() != ApplicationMode::MOTIONCAPTURE);
+        // or motion blur.
+        bool frameChanged = sv.hasChanged(scene_rdl2::rdl2::SceneVariables::sFrameKey);
 
         // Our camera could have changed.
         // A camera change requires a geometry rebuild, our definition of
@@ -1895,14 +1921,11 @@ RenderContext::renderPrep(bool allowUnsupportedXPUFeatures)
 
         mRenderPrepTimingStats->recTime(RenderPrepTimingStats::RenderPrepTag::LOAD_GEOMETRIES);
 
-        // Report memory footprint for geometry primitives.
-        if (mOptions.getApplicationMode() != ApplicationMode::MOTIONCAPTURE) {
-            if (mRenderStats->getLogInfo() ||
-                mRenderStats->getLogCsv()  ||
-                mRenderStats->getLogAthena()) {
-                reportGeometryTessellationTime();
-                reportGeometryMemory();
-            }
+        if (mRenderStats->getLogInfo() ||
+            mRenderStats->getLogCsv()  ||
+            mRenderStats->getLogAthena()) {
+            reportGeometryTessellationTime();
+            reportGeometryMemory();
         }
 
         mRenderPrepTimingStats->recTime(RenderPrepTimingStats::RenderPrepTag::REPORT_GEOMETRY_MEMORY);
@@ -1944,13 +1967,26 @@ RenderContext::renderPrep(bool allowUnsupportedXPUFeatures)
     // Update XPU
     if (mExecutionMode == mcrt_common::ExecutionMode::XPU) {
         // Any update to the scene causes render prep to re-run which resets mExecutionMode.
-        // Thus we must recreate the GPU accelerator to sync up with any scene changes and to
-        // fall back properly if there is a problem.  E.g. what if we were running in XPU mode and
-        // then a delta was applied that contained something incompatible with XPU?
-        mGeometryManager->updateGPUAccelerator(allowUnsupportedXPUFeatures, getNumTBBThreads(), mLayer);
-        if (mGeometryManager->getGPUAccelerator() == nullptr) {
-            // fall back to vector mode
-            mExecutionMode = mcrt_common::ExecutionMode::VECTORIZED;
+        if (geomChangeFlag == rt::ChangeFlag::ALL ||
+            (geomChangeFlag == rt::ChangeFlag::UPDATE && !mLayer->getChangedOrDeformedGeometries().empty())) {
+            // We must recreate the GPU accelerator to sync up with any scene changes and to
+            // fall back properly if there is a problem.  E.g. what if we were running in XPU mode and
+            // then a delta was applied that contained something incompatible with XPU?
+            mGeometryManager->updateGPUAccelerator(allowUnsupportedXPUFeatures, getNumTBBThreads(), mLayer);
+            if (mGeometryManager->getGPUAccelerator() == nullptr) {
+                // fall back to vector mode
+                mExecutionMode = mcrt_common::ExecutionMode::VECTORIZED;
+            }
+        } else {
+            // No geometry was updated thus we can reuse the GPU accelerator from the previous frame,
+            // if it exists.  It might not exist because we might have previously fallen back to vector mode
+            // in the above code.
+            if (mGeometryManager->getGPUAccelerator() == nullptr) {
+                // fall back to vector mode
+                mExecutionMode = mcrt_common::ExecutionMode::VECTORIZED;
+                mRenderStats->logString("---------- Setting up GPU ----------------------------------");
+                mRenderStats->logString("GPU Accelerator not initialized, falling back to CPU vector mode");
+            }
         }
     }
     mRenderStats->mBuildGPUAcceleratorTime =
@@ -2075,6 +2111,7 @@ RenderContext::updatePbrState(const FrameState &fs)
     integratorParams.mIntegratorMaxSubsurfacePerPath           = vars.get(scene_rdl2::rdl2::SceneVariables::sMaxSubsurfacePerPath);
     integratorParams.mIntegratorTransparencyThreshold          = vars.get(scene_rdl2::rdl2::SceneVariables::sTransparencyThreshold);
     integratorParams.mIntegratorPresenceThreshold              = vars.get(scene_rdl2::rdl2::SceneVariables::sPresenceThreshold);
+    integratorParams.mIntegratorPresenceQuality                = saturate(vars.get(scene_rdl2::rdl2::SceneVariables::sPresenceQuality));
     integratorParams.mIntegratorRussianRouletteThreshold       = vars.get(scene_rdl2::rdl2::SceneVariables::sRussianRouletteThreshold);
     integratorParams.mSampleClampingValue                      = vars.get(scene_rdl2::rdl2::SceneVariables::sSampleClampingValue);
     integratorParams.mSampleClampingDepth                      = vars.get(scene_rdl2::rdl2::SceneVariables::sSampleClampingDepth);
@@ -2429,6 +2466,12 @@ RenderContext::loadGeometries(const rt::ChangeFlag flag)
         camera->computeFrustum(&frustums.back(), 1, true);  // frustum at shutter close
     }
 
+    std::vector<mcrt_common::Fishtum> fishtums;
+    if (camera->hasFishtum()) {
+        fishtums.push_back(mcrt_common::Fishtum());
+        camera->computeFishtum(&fishtums.back(), 0, true);  // fishtum at shutter open
+    }
+
     // configure the way to construct spatial accelerator
     constexpr rt::OptimizationTarget accelMode = rt::OptimizationTarget::HIGH_QUALITY_BVH_BUILD;
 
@@ -2442,7 +2485,7 @@ RenderContext::loadGeometries(const rt::ChangeFlag flag)
         return RP_RESULT::CANCELED;
     }
     const scene_rdl2::rdl2::Camera* dicingCamera = mSceneContext->getDicingCamera();
-    if (mGeometryManager->finalizeChanges(mLayer, motionBlurParams, frustums,
+    if (mGeometryManager->finalizeChanges(mLayer, motionBlurParams, frustums, fishtums,
                                           world2render, accelMode, dicingCamera, 
                                           true /*update scene bvh*/) == rt::GeometryManager::GM_RESULT::CANCELED) {
         return RP_RESULT::CANCELED;
@@ -2457,8 +2500,9 @@ RenderContext::loadGeometries(const rt::ChangeFlag flag)
     if (mRenderPrepExecTracker.startFinalizeChange1() == RenderPrepExecTracker::RESULT::CANCELED) {
         return RP_RESULT::CANCELED;
     }
-    if (mGeometryManager->finalizeChanges(mMeshLightLayer, motionBlurParams, frustums,
-                                          world2render, accelMode, dicingCamera, false /*don't update scene bvh*/) ==
+    if (mGeometryManager->finalizeChanges(mMeshLightLayer, motionBlurParams, frustums, fishtums,
+                                          world2render, accelMode, dicingCamera,
+                                          false /*don't update scene bvh*/) ==
         rt::GeometryManager::GM_RESULT::CANCELED) {
         return RP_RESULT::CANCELED;
     }
@@ -2955,6 +2999,7 @@ RenderContext::buildFrameState(FrameState *fs, double frameStartTime) const
     // the presence shadow handler in vectorized mode need to access this value
     fs->mMaxPresenceDepth = vars.get(scene_rdl2::rdl2::SceneVariables::sMaxPresenceDepth);
     fs->mPresenceThreshold = vars.get(scene_rdl2::rdl2::SceneVariables::sPresenceThreshold);
+    fs->mPresenceQuality = saturate(vars.get(scene_rdl2::rdl2::SceneVariables::sPresenceQuality));
 
     fs->mShadowTerminatorFix = static_cast<shading::ShadowTerminatorFix>
         (vars.get(scene_rdl2::rdl2::SceneVariables::sShadowTerminatorFix));
@@ -3076,6 +3121,9 @@ RenderContext::getMotionBlurParams(bool bake) const
     auto sceneVarsMotionSteps =
         mSceneContext->getSceneVariables().get(scene_rdl2::rdl2::SceneVariables::sMotionSteps);
 
+    bool slerpXforms =
+        mSceneContext->getSceneVariables().get(scene_rdl2::rdl2::SceneVariables::sSlerpXforms);
+
     bool isMotionBlurOn = mSceneContext->getSceneVariables().get(scene_rdl2::rdl2::SceneVariables::sEnableMotionBlur);
 
     // Get the motion steps. We need these both when motion blur is on and off
@@ -3113,7 +3161,7 @@ RenderContext::getMotionBlurParams(bool bake) const
 
     float fps = mSceneContext->getSceneVariables().get(scene_rdl2::rdl2::SceneVariables::sFpsKey);
 
-    return geom::MotionBlurParams(motionSteps, shutterOpen, shutterClose, isMotionBlurOn, fps);
+    return geom::MotionBlurParams(motionSteps, shutterOpen, shutterClose, isMotionBlurOn, fps, slerpXforms);
 }
 
 void
@@ -3281,7 +3329,8 @@ RenderContext::canRunVectorized(std::string &reason) const
     // over all the render outputs once, checking for all the problem types.
     // The issues will still be reported in alphabetical order.
     bool hasDeepOutput = false;
-    bool hasRefractCrypto = false;
+    bool hasReflectedCryptomatte = false;
+    bool hasRefractedCryptomatte = false;
     const scene_rdl2::rdl2::SceneContext::RenderOutputVector &ros = mSceneContext->getAllRenderOutputs();
     for (auto roItr = ros.cbegin(); roItr != ros.cend(); ++roItr) {
         const scene_rdl2::rdl2::RenderOutput *ro = *roItr;
@@ -3290,8 +3339,12 @@ RenderContext::canRunVectorized(std::string &reason) const
                 hasDeepOutput = true;
             }
             if (ro->getResult() == scene_rdl2::rdl2::RenderOutput::RESULT_CRYPTOMATTE &&
-                ro->getCryptomatteEnableRefract()) {
-                hasRefractCrypto = true;
+                ro->getCryptomatteRecordReflected()) {
+                hasReflectedCryptomatte = true;
+            }
+            if (ro->getResult() == scene_rdl2::rdl2::RenderOutput::RESULT_CRYPTOMATTE &&
+                ro->getCryptomatteRecordRefracted()) {
+                hasRefractedCryptomatte = true;
             }
         }
     }
@@ -3323,9 +3376,11 @@ RenderContext::canRunVectorized(std::string &reason) const
         }
     }
 
-    // Refractive crypto: MOONRAY-5074
-    if (hasRefractCrypto) {
-        fail("refractive cryptomattes");
+    if (hasReflectedCryptomatte) {
+        fail("reflected cryptomatte");
+    }
+    if (hasRefractedCryptomatte) {
+        fail("refracted cryptomatte");
     }
 
     return result;

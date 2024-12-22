@@ -72,6 +72,8 @@ public:
 
     static uint32_t getRaysBufSize() { return mRaysBufSize; }
 
+    void* instanceIdToInstancePtr(unsigned int instanceId) const;
+
 private:
     bool build(CUstream cudaStream,
                OptixDeviceContext context,
@@ -99,12 +101,6 @@ private:
     // The module corresponds to one .ptx file of compiled CUDA code.  Everything is in
     // one .cu source file so there is only one module.
     OptixModule mModule;
-
-    // There are special built-in modules for Optix round curves
-    OptixModule mRoundLinearCurvesModule;
-    OptixModule mRoundLinearCurvesMBModule;
-    OptixModule mRoundCubicBsplineCurvesModule;
-    OptixModule mRoundCubicBsplineCurvesMBModule;
 
     // Specifies the programs to call for ray generation and for each different type of
     // geometry (OptixGPUPrimitive):
@@ -153,6 +149,10 @@ private:
 
     // A parameters object that is globally available on the GPU side.
     mutable std::vector<OptixGPUBuffer<OptixGPUParams>> mParamsBuf; // per-thread (queue) param buffers
+
+    // Optix only supports a 32-bit instance ID but we need the original 64-bit Instance* pointer from
+    // the ray intersection.
+    std::vector<void*> mInstanceIdToInstancePtr;
 };
 
 } // namespace rt

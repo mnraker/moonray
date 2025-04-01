@@ -85,21 +85,6 @@ static_assert(sizeof(Int128) == 16,
 
 // Copied out of MSVC STL's std::atomic
 
-#ifdef _WIN64
-#if _STD_ATOMIC_ALWAYS_USE_CMPXCHG16B == 1
-#define _STD_COMPARE_EXCHANGE_128 _InterlockedCompareExchange128
-#else // ^^^ _STD_ATOMIC_ALWAYS_USE_CMPXCHG16B == 1 / _STD_ATOMIC_ALWAYS_USE_CMPXCHG16B == 0 vvv
-#define _STD_COMPARE_EXCHANGE_128 __std_atomic_compare_exchange_128
-#endif // ^^^ _STD_ATOMIC_ALWAYS_USE_CMPXCHG16B == 0 ^^^
-#endif // defined(_WIN64)
-
-// Controls whether atomic::is_always_lock_free triggers for sizeof(void *) or 2 * sizeof(void *)
-#if _STD_ATOMIC_ALWAYS_USE_CMPXCHG16B == 1 || !defined(_M_X64) || defined(_M_ARM64EC)
-#define _ATOMIC_HAS_DCAS 1
-#else // ^^^ We always have DCAS / We only sometimes have DCAS vvv
-#define _ATOMIC_HAS_DCAS 0
-#endif // ^^^ We only sometimes have DCAS ^^^
-
 // Controls whether ARM64 ldar/ldapr/stlr should be used
 #ifndef _STD_ATOMIC_USE_ARM64_LDAR_STLR
 #if defined(_M_ARM64) || defined(_M_ARM64EC)
@@ -428,7 +413,7 @@ static inline Int128 load(Int128 const *ptr, const std::memory_order _Order = st
     long long* const _ptr = (long long* const)ptr;
     Int128 _Result{}; // atomic CAS 0 with 0
     _Check_load_memory_order(_Order);
-    (void) _STD_COMPARE_EXCHANGE_128(_ptr, 0, 0, &_Result._Low);
+    (void) _InterlockedCompareExchange128(_ptr, 0, 0, &_Result._Low);
     return _Result;
 #endif // ^^^ _M_X64 ^^^
 }
@@ -657,7 +642,7 @@ static inline bool compare_exchange_strong(Int128 *ptr, Int128 *_Expected, const
                 &_Expected_temp._Low);
 #else // ^^^ _M_ARM64, _M_ARM64EC / _M_X64 vvv
             (void) _Order;
-            _Result = _STD_COMPARE_EXCHANGE_128(&reinterpret_cast<long long&>(ptr), _Desired_bytes._High,
+            _Result = _InterlockedCompareExchange128(&reinterpret_cast<long long&>(ptr), _Desired_bytes._High,
                 _Desired_bytes._Low, &_Expected_temp._Low);
 #endif // ^^^ _M_X64 ^^^
             if (_Result) {
@@ -682,7 +667,7 @@ static inline bool compare_exchange_strong(Int128 *ptr, Int128 *_Expected, const
         reinterpret_cast<long long>(ptr), _Desired_bytes._High, _Desired_bytes._Low, &_Expected_temp._Low);
 #else // ^^^ _M_ARM64, _M_ARM64EC / _M_X64 vvv
     (void) _Order;
-    _Result = _STD_COMPARE_EXCHANGE_128(
+    _Result = _InterlockedCompareExchange128(
         &reinterpret_cast<long long&>(ptr), _Desired_bytes._High, _Desired_bytes._Low, &_Expected_temp._Low);
 #endif // ^^^ _M_X64 ^^^
     if (_Result == 0) {
@@ -711,7 +696,6 @@ static inline bool compare_exchange_strong(Int128 *ptr, Int128 *_Expected, const
 #undef __STORE_RELEASE
 #undef _STD_ATOMIC_USE_ARM64_LDAR_STLR
 
-#undef _STD_COMPARE_EXCHANGE_128
 #undef _INVALID_MEMORY_ORDER
 
 #endif // #ifdef _MSC_VER
@@ -737,22 +721,12 @@ constexpr std::memory_order compare_exchange_duo(std::memory_order in) noexcept
 
 static constexpr bool __atomic_always_lock_free(size_t size, [[maybe_unused]] void *ptr)
 {
-#if _STD_ATOMIC_ALWAYS_USE_CMPXCHG16B == 1 || !defined(_M_X64) || defined(_M_ARM64EC)
     return size <= 2 * sizeof(void*);
-#else
-    return size <= sizeof(void*);
-#endif
 }
 
 static bool __atomic_is_lock_free(size_t size, [[maybe_unused]] void *ptr) {
-#if _ATOMIC_HAS_DCAS
-        return size <= 2 * sizeof(void*);
-#else // ^^^ _ATOMIC_HAS_DCAS / !_ATOMIC_HAS_DCAS vvv
-        return size <= sizeof(void*) || (size <= 2 * sizeof(void*) && __std_atomic_has_cmpxchg16b());
-#endif // _ATOMIC_HAS_DCAS
+    return size <= 2 * sizeof(void*);
 }
-
-#undef _ATOMIC_HAS_DCAS
 
 template<typename T>
 static void __atomic_store(T *ptr, T *t, int m) noexcept

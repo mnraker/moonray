@@ -15,6 +15,7 @@ target_link_libraries(${target}
     PRIVATE
         Moonray::statistics
         SceneRdl2::pdevunit
+        ${CMAKE_DL_LIBS}
 )
 
 # Set standard compile/link options

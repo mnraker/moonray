@@ -21,6 +21,7 @@
 #pragma push_macro("NORMAL")
 #undef COLOR
 #undef NORMAL
+#include <Imath/ImathVec.h>
 #include <OpenImageIO/version.h>
 #include <OpenImageIO/texture.h>
 #pragma pop_macro("COLOR")
